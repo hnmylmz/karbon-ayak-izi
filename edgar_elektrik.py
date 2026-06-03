@@ -168,6 +168,7 @@ if __name__ == "__main__":
     # Ulaşım katsayıları
     transport_factors = calculate_turkey_transport_factors()
     
-    print(f"\n✅ Türkiye'ye özel katsayılar hazır!")
+    print("\n✅ Türkiye'ye özel katsayılar hazır!")
     print(f"⚡ Elektrik: {'EDGAR tabanlı' if electricity_factors else 'Varsayılan'}")
-    print(f"🚌 Ulaşım: {'Türkiye'ye özgü' if transport_factors else 'Varsayılan'}")
+    # Avoid nested single quotes in f-string by separating arguments
+    print("🚌 Ulaşım:", "Türkiye'ye özgü" if transport_factors else "Varsayılan")
