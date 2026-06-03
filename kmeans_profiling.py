@@ -15,8 +15,8 @@ import constants
 def load_user_data():
     """Mevcut kullanıcı verilerini yükle"""
     try:
-        # Sentetik veri setini yükle
-        df = pd.read_csv("archive/sentetik/sentetik_tr_ulasim_haftalik_temiz.csv")
+        # Türkiye temizliklenmiş veri setini yükle
+        df = pd.read_csv("data/turkiye_emisyon_temiz.csv")
         
         # Kullanıcı bazında özetle
         user_profiles = df.groupby('user_id').agg({

@@ -86,7 +86,8 @@ def temizle_veri_seti(input_path, output_path):
     return df_extended
 
 if __name__ == "__main__":
-    input_path = "archive/sentetik/sentetik_tr_ulasim_haftalik.csv"
-    output_path = "archive/sentetik/sentetik_tr_ulasim_haftalik_temiz.csv"
-    
+    # Varsayılan olarak proje veri klasöründeki Türkiye emisyon verisini kullan
+    input_path = "data/turkiye_emisyon.csv"
+    output_path = "data/turkiye_emisyon_temiz.csv"
+
     temizlenmis_veri = temizle_veri_seti(input_path, output_path)

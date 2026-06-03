@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
-# Veri setini yükle
-data_path = Path("archive/sentetik/sentetik_tr_ulasim_haftalik.csv")
+# Veri setini yükle (temizlenmiş Türkiye verisi)
+data_path = Path("data/turkiye_emisyon_temiz.csv")
 df = pd.read_csv(data_path)
 
 print("=== VERİ SETİ ANALİZİ ===")
