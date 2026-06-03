@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+modeller/secret.key
+modeller/*.db
+karbon_gecmis.db
+.vscode/
+.pytest_cache/
+instance/
+.env.*
