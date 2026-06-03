@@ -1,0 +1,1246 @@
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karbon Ayak Izi Takipcisi</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card: rgba(255, 255, 255, 0.95);
+            --soft: #f3f4f6;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --accent: #10b981;
+            --accent-hover: #059669;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --purple: #8b5cf6;
+            --pink: #ec4899;
+            --yellow: #eab308;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px;
+            position: relative;
+        }
+        .wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+        .card {
+            background: var(--card);
+            border: 2px solid #e5e7eb;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            backdrop-filter: blur(10px);
+        }
+        .hero-section {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px 0;
+        }
+        .hero-section h1 {
+            flex: 1 1 100%;
+            margin: 0 auto 16px;
+            font-size: 3rem;
+            font-family: 'Poppins', 'Segoe UI', Arial, sans-serif;
+            letter-spacing: -0.04em;
+            line-height: 1.05;
+            color: #111827;
+            font-weight: 800;
+            text-align: center;
+        }
+        .hero-section .user-meta {
+            width: 100%;
+            text-align: center;
+            margin-top: 10px;
+        }
+        .tabs {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin: 0 0 24px;
+        }
+        .tab-btn {
+            background: rgba(255, 255, 255, 0.85);
+            border: 2px solid transparent;
+            border-radius: 16px;
+            color: var(--text);
+            font-weight: 700;
+            padding: 14px 18px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            text-align: center;
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+        }
+        .tab-btn:hover {
+            transform: translateY(-1px);
+            border-color: rgba(59, 130, 246, 0.25);
+        }
+        .tab-btn.active {
+            background: white;
+            border-color: rgba(16, 185, 129, 0.35);
+            box-shadow: 0 18px 30px rgba(16, 185, 129, 0.15);
+            color: #111827;
+        }
+        .tab-panel {
+            display: none;
+            animation: fadeIn 0.35s ease;
+        }
+        .tab-panel.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .stats-row {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, var(--purple), var(--pink));
+            color: white;
+            padding: 16px 24px;
+            border-radius: 16px;
+            font-weight: 600;
+            box-shadow: 0 8px 16px rgba(139, 92, 246, 0.3);
+            transition: transform 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+        h2 { margin-top: 0; font-size: 1.3rem; color: var(--info); font-weight: 600; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .form-section {
+            background: rgba(243, 244, 246, 0.5);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e5e7eb;
+        }
+        .form-section h3 {
+            margin-top: 0;
+            color: var(--info);
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .form-section h3::before {
+            content: "📊";
+            font-size: 1.2rem;
+        }
+        label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); font-size: 0.95rem; }
+        input {
+            width: 100%;
+            border: 2px solid #e5e7eb;
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--text);
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+            transform: translateY(-1px);
+        }
+        .full { grid-column: 1 / -1; }
+        button {
+            border: none;
+            background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+            color: white;
+            font-weight: 700;
+            border-radius: 12px;
+            padding: 14px 20px;
+            cursor: pointer;
+            margin-top: 12px;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .history-item-btn {
+            border: none;
+            background: transparent;
+            color: var(--info);
+            font-weight: 700;
+            padding: 0;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .history-item-btn:hover {
+            color: #2563eb;
+        }
+        .muted { color: var(--muted); font-size: 0.92rem; background: rgba(107, 114, 128, 0.1); padding: 8px 12px; border-radius: 8px; border-left: 4px solid var(--info); }
+        .error {
+            margin-top: 10px;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+            border: 2px solid var(--danger);
+            color: var(--danger);
+            padding: 12px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+        .invalid {
+            border-color: #ef4444 !important;
+            background-color: #fef2f2 !important;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
+        }
+        .result {
+            margin-top: 12px;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
+            border: 2px solid var(--accent);
+            padding: 16px;
+            border-radius: 12px;
+            line-height: 1.6;
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1);
+        }
+        .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .chip {
+            background: linear-gradient(135deg, var(--purple), var(--pink));
+            border: none;
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 0.85rem;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .slider-value {
+            margin-top: 8px;
+            font-size: 0.92rem;
+            color: var(--text);
+            font-weight: 600;
+        }
+        .chat-box {
+            height: 330px;
+            overflow-y: auto;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(243, 244, 246, 0.95));
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+        }
+        .msg { margin: 8px 0; line-height: 1.4; padding: 8px 12px; border-radius: 8px; }
+        .user { color: var(--info); background: rgba(59, 130, 246, 0.1); border-left: 3px solid var(--info); }
+        .bot { color: var(--accent); background: rgba(16, 185, 129, 0.1); border-left: 3px solid var(--accent); }
+        .chat-row { display: flex; gap: 8px; }
+        .chat-row input { flex: 1; }
+        .chart-section {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
+            border: 2px solid rgba(59, 130, 246, 0.2);
+        }
+        #aylikGrafik {
+            height: 220px !important;
+            max-height: 220px;
+            max-width: 620px;
+            width: 100% !important;
+            margin: 0 auto;
+            display: block;
+        }
+        #karsilastirmaNot {
+            margin-top: 8px;
+            font-size: 0.88rem;
+            color: var(--muted);
+        }
+        .badge {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .badge-high { background: linear-gradient(135deg, var(--danger), #dc2626); color: white; border: none; }
+        .badge-low { background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: white; border: none; }
+        .chat-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .chat-toggle-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--purple), var(--pink));
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(139, 92, 246, 0.4);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+        }
+        .chat-toggle-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 15px 35px rgba(139, 92, 246, 0.6);
+        }
+        .chat-container {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 350px;
+            height: 450px;
+            background: var(--card);
+            border: 2px solid #e5e7eb;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 999;
+        }
+        .chat-container.active {
+            display: flex;
+        }
+        .chat-header {
+            background: linear-gradient(135deg, var(--purple), var(--pink));
+            color: white;
+            padding: 16px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.3s ease;
+        }
+        .chat-close-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .chat-widget .chat-box {
+            flex: 1;
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            background: rgba(255, 255, 255, 0.95);
+        }
+        .chat-widget .chat-row {
+            padding: 12px;
+            border-top: 1px solid #e5e7eb;
+            margin: 0;
+            gap: 8px;
+        }
+        .chat-widget .chat-row input {
+            border: 1px solid #e5e7eb;
+            padding: 8px 12px;
+        }
+        .chat-widget .chat-row button {
+            margin: 0;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+        }
+        @media (max-width: 920px) {
+            .wrap { grid-template-columns: 1fr; }
+            .grid { grid-template-columns: 1fr; }
+            .chat-container {
+                width: 90vw;
+                right: 5vw;
+                max-width: 350px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <section class="card">
+            <div class="hero-section">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h1>Karbon Ayak Izi Takipcisi</h1>
+                    <div class="user-meta" style="text-align:center;">
+                        {% if current_user and current_user.is_authenticated %}
+                            <div>Hoş geldin, <strong>{{ current_user.username }}</strong></div>
+                            <div><a href="{{ url_for('logout') }}">Çıkış</a></div>
+                        {% else %}
+                            <div><a href="{{ url_for('login') }}">Giriş</a> · <a href="{{ url_for('register') }}">Kayıt</a></div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="stats-row">
+                    <div class="stat-card">🌱 Sürdürülebilir Gelecek</div>
+                    <div class="stat-card">📊 Veri Analizi</div>
+                    <div class="stat-card">🤖 AI Destekli</div>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button type="button" class="tab-btn active" data-tab="giris" onclick="switchTab('giris')">📝 Veri Girişi</button>
+                <button type="button" class="tab-btn" data-tab="grafikler" onclick="switchTab('grafikler')">📈 Grafik & Simülasyon</button>
+                <button type="button" class="tab-btn" data-tab="yardim" onclick="switchTab('yardim')">💬 Yardım</button>
+            </div>
+            <div class="tab-panel active" id="panel-giris">
+            <form method="post" novalidate autocomplete="off">
+                <!-- User identity comes from authenticated account -->
+                <script>
+                    const CURRENT_USERNAME = "{{ current_user.username if current_user and current_user.is_authenticated else '' }}";
+                    const CURRENT_USER_AD = "{{ current_user.ad if current_user and current_user.is_authenticated else '' }}";
+                    const CURRENT_USER_SOYAD = "{{ current_user.soyad if current_user and current_user.is_authenticated else '' }}";
+                </script>
+
+                <!-- Hidden fields for authenticated users -->
+                {% if current_user and current_user.is_authenticated %}
+                    <input type="hidden" name="ad" value="{{ current_user.ad }}">
+                    <input type="hidden" name="soyad" value="{{ current_user.soyad }}">
+                {% endif %}
+
+                <div class="form-section">
+                    <h3>Enerji Tüketimi</h3>
+                    <div class="grid">
+                        <div>
+                            <label>Elektrik (kWh/ay)</label>
+                            <input type="number" min="0" step="0.01" name="electricity_kwh" value="{{ form_data.electricity_kwh }}" required>
+                        </div>
+                        <div>
+                            <label>Dogalgaz (m3/ay)</label>
+                            <input type="number" min="0" step="0.01" name="dogalgaz_m3" value="{{ form_data.dogalgaz_m3 }}" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>🍽 Gıda Tüketimi</h3>
+                    <div class="grid">
+                        <div>
+                            <label>Kırmızı Et (kg/ay)</label>
+                            <input type="number" min="0" step="0.01" name="kirmizi_et" value="{{ form_data.kirmizi_et or '0' }}">
+                        </div>
+                        <div>
+                            <label>Beyaz Et (kg/ay)</label>
+                            <input type="number" min="0" step="0.01" name="beyaz_et" value="{{ form_data.beyaz_et or '0' }}">
+                        </div>
+                        <div>
+                            <label>Balık (kg/ay)</label>
+                            <input type="number" min="0" step="0.01" name="balik" value="{{ form_data.balik or '0' }}">
+                        </div>
+                        <div>
+                            <label>Süt Ürünleri (kg/ay)</label>
+                            <input type="number" min="0" step="0.01" name="sut_urunleri" value="{{ form_data.sut_urunleri or '0' }}">
+                        </div>
+                        <div>
+                            <label>Yumurta (adet/ay)</label>
+                            <input type="number" min="0" step="0.01" name="yumurta" value="{{ form_data.yumurta or '0' }}">
+                        </div>
+                        <div>
+                            <label>Sebzeler (kg/ay)</label>
+                            <input type="number" min="0" step="0.01" name="sebzeler" value="{{ form_data.sebzeler or '0' }}">
+                        </div>
+                        <div>
+                            <label>Meyveler (kg/ay)</label>
+                            <input type="number" min="0" step="0.01" name="meyveler" value="{{ form_data.meyveler or '0' }}">
+                        </div>
+                        <div>
+                            <label>Giyim (adet/ay)</label>
+                            <input type="number" min="0" step="0.01" name="giyim" value="{{ form_data.giyim or '0' }}">
+                        </div>
+                        <div>
+                            <label>Elektronik (saat/ay)</label>
+                            <input type="number" min="0" step="0.01" name="elektronik" value="{{ form_data.elektronik or '0' }}">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>🚌 Ulaşım Bilgileri</h3>
+                    <div class="grid">
+                        <div>
+                            <label>Dolmuş (km/ay)</label>
+                            <input type="number" min="0" step="0.01" name="dolmus_km" value="{{ form_data.dolmus_km }}" required>
+                        </div>
+                        <div>
+                            <label>Minibüs (km/ay)</label>
+                            <input type="number" min="0" step="0.01" name="minibus_km" value="{{ form_data.minibus_km or '0' }}">
+                        </div>
+                        <div>
+                            <label>Otobüs (km/ay)</label>
+                            <input type="number" min="0" step="0.01" name="otobus_km" value="{{ form_data.otobus_km }}" required>
+                        </div>
+                        <div>
+                            <label>Metro/Tramvay (km/ay)</label>
+                            <input type="number" min="0" step="0.01" name="metro_km" value="{{ form_data.metro_km }}" required>
+                        </div>
+                        <div>
+                            <label>Otomobil (km/ay)</label>
+                            <input type="number" min="0" step="0.01" name="otomobil_km" value="{{ form_data.otomobil_km }}" required>
+                        </div>
+                        <div>
+                            <label>Taksi (km/ay)</label>
+                            <input type="number" min="0" step="0.01" name="taksi_km" value="{{ form_data.taksi_km or '0' }}">
+                        </div>
+                        <div>
+                            <label>Tren (km/ay)</label>
+                            <input type="number" min="0" step="0.01" name="tren_km" value="{{ form_data.tren_km or '0' }}">
+                        </div>
+                        <div>
+                            <label>Gemi (km/ay)</label>
+                            <input type="number" min="0" step="0.01" name="gemi_km" value="{{ form_data.gemi_km or '0' }}">
+                        </div>
+                        <div class="full">
+                            <label>Uçak (km/ay)</label>
+                            <input type="number" min="0" step="0.01" name="ucak_km" value="{{ form_data.ucak_km }}" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-section">
+                    <h3>🤖 ML Model Parametreleri</h3>
+                    <div class="grid">
+                        <div>
+                            <label>Hafta (1-52)</label>
+                            <input type="number" min="1" max="52" step="1" name="hafta" value="{{ form_data.hafta }}" required>
+                        </div>
+                        <div>
+                            <label>Arac Sahibi (0/1)</label>
+                            <input type="number" min="0" max="1" step="1" name="arac_sahibi" value="{{ form_data.arac_sahibi }}" required>
+                        </div>
+                        <div>
+                            <label>Lag-1 CO2 (kg)</label>
+                            <input type="number" min="0" step="0.01" name="lag_1_co2" value="{{ form_data.lag_1_co2 }}" required>
+                        </div>
+                        <div>
+                            <label>Lag-2 CO2 (kg)</label>
+                            <input type="number" min="0" step="0.01" name="lag_2_co2" value="{{ form_data.lag_2_co2 }}" required>
+                        </div>
+                        <div>
+                            <label>Lag-3 CO2 (kg)</label>
+                            <input type="number" min="0" step="0.01" name="lag_3_co2" value="{{ form_data.lag_3_co2 }}" required>
+                        </div>
+                        <div class="full">
+                            <label>Lag-4 CO2 (kg)</label>
+                            <input type="number" min="0" step="0.01" name="lag_4_co2" value="{{ form_data.lag_4_co2 }}" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+                    <button type="button" onclick="otomatikLagDoldur()">🔄 Lagları Otomatik Doldur</button>
+                    <button type="submit" style="background: linear-gradient(135deg, var(--accent), var(--accent-hover));">📊 Karbon Ayak İzini Hesapla</button>
+                </div>
+            </form>
+
+            {% if error %}
+                <div class="error">
+                    {{ error }}
+                    {% if field_errors %}
+                        <ul style="margin:8px 0 0 18px; padding-left: 16px;">
+                            {% for field, msg in field_errors.items() %}
+                                <li><strong>{{ field }}</strong>: {{ msg }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            {% endif %}
+            {% if field_errors %}
+                <script>
+                    window.addEventListener('DOMContentLoaded', () => {
+                        const invalidFields = {{ field_errors|tojson }};
+                        let firstInvalidInput = null;
+
+                        // Önceki tüm invalid sınıflarını temizle
+                        document.querySelectorAll('input').forEach(input => input.classList.remove('invalid'));
+
+                        // Backend'den gelen hatalı alanları bul ve işaretle
+                        Object.keys(invalidFields).forEach((fieldName) => {
+                            const input = document.querySelector(`[name="${fieldName}"]`);
+                            if (input) {
+                                input.classList.add('invalid');
+                                if (!firstInvalidInput) {
+                                    firstInvalidInput = input; // İlk hatalı inputu yakala
+                                }
+                            }
+                        });
+
+                        // Eğer hatalı bir input bulunduysa oraya yumuşakça kaydır ve odaklan
+                        if (firstInvalidInput) {
+                            setTimeout(() => {
+                                firstInvalidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                firstInvalidInput.focus();
+                            }, 200);
+                        } else {
+                            // Input dışı bir hata varsa direkt hata kutusuna kaydır
+                            const errBox = document.querySelector('.error');
+                            if (errBox) {
+                                errBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        }
+                    });
+                </script>
+            {% endif %}
+
+            {% if sonuc %}
+                <div id="sonucPaneli" class="result">
+                    <strong>Kullanici:</strong> {{ sonuc_kisi }}<br>
+                    <strong>Kural Motoru Toplam:</strong> {{ sonuc.toplam_kg }} kgCO2e ({{ sonuc.toplam_ton }} tonCO2e)<br>
+                    <strong>ML Gelecek Hafta Tahmini:</strong> {{ tahmin.gelecek_hafta_kg }} kgCO2e (Kaynak: {{ tahmin.kaynak }})
+                    <div class="chips">
+                        {% for ad, deger in sonuc.kalemler.items() %}
+                            <span class="chip">{{ ad }}: {{ deger }} kg</span>
+                        {% endfor %}
+                    </div>
+                    {% if aksiyon %}
+                        <hr>
+                        <strong>ML Yorum:</strong> {{ aksiyon.analiz }}
+                        {% if aksiyon.bolum_onerileri %}
+                            {% for kategori, maddeler in aksiyon.bolum_onerileri.items() %}
+                                {% if maddeler %}
+                                    <h4 style="margin:10px 12px 2px;">{{ kategori }} Önerileri</h4>
+                                    <ul style="margin:8px 0 0 18px; padding:0;">
+                                        {% for madde in maddeler %}
+                                            <li>{{ madde }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <ul style="margin:8px 0 0 18px; padding:0;">
+                                {% for madde in aksiyon.oneriler %}
+                                    <li>{{ madde }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    {% endif %}
+                    {% if analysis %}
+                        <hr>
+                        <h3>Yapay Zeka Analiz Raporu</h3>
+                        <ul style="margin:8px 0 0 18px; padding:0;">
+                            {% for satir in analysis %}
+                                <li>{{ satir }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            {% endif %}
+            {% if current_user and current_user.is_authenticated %}
+                <div class="form-section" style="margin-top:12px;">
+                    <h3>Kişisel Geçmiş (Son Kayıtlar)</h3>
+                    {% if user_history %}
+                        <ul>
+                            {% for h in user_history %}
+                                <li><button type="button" class="history-item-btn" onclick="showHistoryDetails({{ h.id }})">{{ h.created_at }} — {{ h.toplam_kg }} kg</button></li>
+                            {% endfor %}
+                        </ul>
+                        <div id="historyDetails" class="result" style="display:none; margin-top:16px;"></div>
+                    {% else %}
+                        <div class="muted">Henüz kaydınız yok.</div>
+                    {% endif %}
+                </div>
+            {% endif %}
+            </div>
+            <div class="tab-panel" id="panel-grafikler">
+            <div class="chart-wrap chart-section" style="margin-top: 30px;">
+                <h2>📈 Aylik Karsilastirma Grafigi</h2>
+                <p class="muted">Grafik, giriş yapmış kullanıcı için otomatik olarak yüklenecek.</p>
+                <button type="button" onclick="grafikYukle()">Grafiği Güncelle</button>
+                <canvas id="aylikGrafik" height="70"></canvas>
+                <div id="karsilastirmaNot"></div>
+                <div id="karsilastirmaRozet"></div>
+                <div id="simulatorPanel" class="card" style="display: block; margin-top: 24px;">
+                    <h2>🧪 Karbon Azaltma Simülatörü</h2>
+                    <p class="muted">Sliderları kaydırarak azaltımın tahmini nasıl etkilediğini anında gör.</p>
+                    <div class="grid">
+                        <div>
+                            <label>Ulaşım Mesafesini Azalt (%)</label>
+                            <input type="range" id="transportReduction" min="0" max="100" step="1" value="0">
+                            <div class="slider-value">Azaltım: <span id="transportReductionValue">0</span>%</div>
+                        </div>
+                        <div>
+                            <label>Enerji Tüketimini Azalt (%)</label>
+                            <input type="range" id="energyReduction" min="0" max="100" step="1" value="0">
+                            <div class="slider-value">Azaltım: <span id="energyReductionValue">0</span>%</div>
+                        </div>
+                        <div>
+                            <label>Gıda Tüketimini Azalt (%)</label>
+                            <input type="range" id="foodReduction" min="0" max="100" step="1" value="0">
+                            <div class="slider-value">Azaltım: <span id="foodReductionValue">0</span>%</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <button type="button" onclick="autoFillForSimulation()" style="margin-right:8px;">Otomatik Doldur</button>
+                        <span id="simulatorWarning" style="color:#9a3412; margin-left:8px; display:none;"></span>
+                    </div>
+                    <div id="simulationResult" class="result" style="margin-top: 16px;">
+                        <strong>Simülasyon sonucunu görmek için sliderları hareket ettir.</strong>
+                    </div>
+                </div>
+            </div>
+            </div>
+            <div class="tab-panel" id="panel-yardim">
+                <div class="card" style="padding: 20px; box-shadow: none;">
+                    <h2>💬 Yardım ve Hızlı Bilgiler</h2>
+                    <p class="muted">Bu alan üzerinden sayfanın özelliklerine kolayca erişebilirsiniz. Sağ alt köşedeki sohbet balonunu kullanarak yapay zeka destekli soru sorabilirsiniz.</p>
+                    <ul style="margin: 16px 0 0 18px; padding: 0; list-style: inside disc; color: var(--text);">
+                        <li>📝 Kişisel ve tüketim verilerini girin.</li>
+                        <li>📈 Aylık karşılaştırma grafiği ile Türkiye ortalamasıyla kıyaslayın.</li>
+                        <li>🧪 Simülasyon ile azaltım etkisini anında görün.</li>
+                        <li>🔄 Doldurma ve yenileme butonlarıyla verileri hızlıca güncelleyin.</li>
+                    </ul>
+                    <p class="muted" style="margin-top: 18px;">Not: <strong>Giriş</strong> sekmesinden formu doldurduktan sonra <strong>Grafik & Simülasyon</strong> sekmesine geçebilirsiniz.</p>
+                </div>
+            </div>
+        </section>
+
+        <aside class="card" style="display: none;">
+            <h2>AI Chatbot</h2>
+            <p class="muted">Katsayi, model ve kullanim hakkinda hizli yardim al.</p>
+            <div id="chatBox" class="chat-box">
+                <div class="msg bot"><strong>Bot:</strong> Merhaba! Karbon takipcisini kullanman icin yardimci olabilirim.</div>
+            </div>
+            <div class="chat-row">
+                <input id="chatInput" type="text" placeholder="Mesajini yaz...">
+                <button type="button" onclick="sendMessage()">Gonder</button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Floating Chat Widget -->
+    <div class="chat-widget">
+        <div id="chatContainer" class="chat-container">
+            <div class="chat-header">
+                <span>🤖 AI Asistan</span>
+                <button class="chat-close-btn" onclick="toggleChat()">×</button>
+            </div>
+            <div id="floatingChatBox" class="chat-box">
+                <div class="msg bot"><strong>Bot:</strong> Merhaba! Karbon takipcisini kullanman icin yardimci olabilirim.</div>
+            </div>
+            <div class="chat-row">
+                <input id="floatingChatInput" type="text" placeholder="Mesajini yaz...">
+                <button type="button" onclick="sendFloatingMessage()">Gonder</button>
+            </div>
+        </div>
+        <button class="chat-toggle-btn" onclick="toggleChat()">💬</button>
+    </div>
+
+    <script>
+        let aylikChart = null;
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.tab === tabId);
+            });
+            document.querySelectorAll('.tab-panel').forEach((panel) => {
+                panel.classList.toggle('active', panel.id === `panel-${tabId}`);
+            });
+        }
+
+        async function otomatikLagDoldur() {
+            try {
+                const response = await fetch(`/laglar`);
+                const laglar = await response.json();
+                if (!response.ok) {
+                    throw new Error("Lag degerleri alinamadi.");
+                }
+
+                document.querySelector('input[name="lag_1_co2"]').value = laglar.lag_1_co2 ?? 0;
+                document.querySelector('input[name="lag_2_co2"]').value = laglar.lag_2_co2 ?? 0;
+                document.querySelector('input[name="lag_3_co2"]').value = laglar.lag_3_co2 ?? 0;
+                document.querySelector('input[name="lag_4_co2"]').value = laglar.lag_4_co2 ?? 0;
+            } catch (e) {
+                alert(`Lag doldurma hatasi: ${e.message}`);
+            }
+        }
+
+        async function showHistoryDetails(recordId) {
+            const detailsEl = document.getElementById("historyDetails");
+            detailsEl.style.display = "none";
+            detailsEl.innerHTML = "Yükleniyor...";
+            try {
+                const response = await fetch(`/history_record/${recordId}`);
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || "Kayıt bilgisi alınamadı.");
+                }
+                const data = await response.json();
+                const kalemler = data.kural.kalemler || {};
+                const chipHtml = Object.entries(kalemler)
+                    .map(([key, value]) => `<span class="chip">${key.replace(/_/g, " ")}: ${value} kg</span>`)
+                    .join("");
+                const analysisHtml = Array.isArray(data.analysis) && data.analysis.length
+                    ? `<h3>Yapay Zeka Analiz Raporu</h3><ul style="margin:8px 0 0 18px; padding:0;">${data.analysis.map((msg) => `<li>${msg}</li>`).join("")}</ul>`
+                    : "";
+                detailsEl.innerHTML = `
+                    <h2>📌 Kayıt Detayı</h2>
+                    <p><strong>Tarih:</strong> ${data.created_at}</p>
+                    <p><strong>Kural Motoru Toplam:</strong> ${data.kural.toplam_kg} kgCO2e (${data.kural.toplam_ton} tonCO2e)</p>
+                    <p><strong>ML Gelecek Hafta Tahmini:</strong> ${data.tahmin.gelecek_hafta_kg} kgCO2e (Kaynak: ${data.tahmin.kaynak})</p>
+                    <div class="chips">${chipHtml}</div>
+                    <hr>
+                    <strong>ML Yorum:</strong> ${data.aksiyon.analiz}
+                    <ul style="margin:8px 0 0 18px; padding:0;">${data.aksiyon.oneriler.map((m) => `<li>${m}</li>`).join("")}</ul>
+                    ${analysisHtml}
+                `;
+                detailsEl.style.display = "block";
+            } catch (e) {
+                detailsEl.innerHTML = `<div class="error">${e.message}</div>`;
+                detailsEl.style.display = "block";
+            }
+        }
+
+        async function grafikYukle() {
+            const notEl = document.getElementById("karsilastirmaNot");
+            const rozetEl = document.getElementById("karsilastirmaRozet");
+            const ad = CURRENT_USER_AD || CURRENT_USERNAME;
+            const soyad = CURRENT_USER_SOYAD || '';
+            if (!ad) {
+                notEl.textContent = "Grafik verisi icin once giris yapmalisiniz.";
+                rozetEl.innerHTML = "";
+                return;
+            }
+
+            try {
+                const response = await fetch(`/grafik_veri`);
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || "Grafik verisi alinamadi.");
+                }
+
+                const ctx = document.getElementById("aylikGrafik").getContext("2d");
+                if (aylikChart) {
+                    aylikChart.destroy();
+                }
+                aylikChart = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: data.labels,
+                        datasets: [
+                            {
+                                label: `${data.kullanici_adi} (kgCO2e)`,
+                                data: data.kullanici,
+                                borderColor: "rgba(34,197,94,0.9)",
+                                backgroundColor: "rgba(34,197,94,0.15)",
+                                borderWidth: 3,
+                                pointRadius: 5,
+                                pointHoverRadius: 7,
+                                tension: 0.25,
+                                fill: true,
+                                yAxisID: "y",
+                            },
+                            {
+                                label: "Turkiye Referans (kgCO2e)",
+                                data: data.turkiye,
+                                borderColor: "#60a5fa",
+                                backgroundColor: "rgba(96,165,250,0.1)",
+                                borderDash: [8, 5],
+                                borderWidth: 2,
+                                pointRadius: 3,
+                                pointHoverRadius: 5,
+                                tension: 0.25,
+                                fill: false,
+                                yAxisID: "y",
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                            },
+                        },
+                        scales: {
+                            x: {
+                                display: true,
+                                title: { display: false },
+                            },
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: "kgCO2e / ay" },
+                            },
+                        },
+                    },
+                });
+                const absPct = Math.abs(Number(data.diff_pct || 0)).toFixed(2);
+                notEl.textContent =
+                    `${data.referans_notu} Son donem ortalamasinda kullanici ${absPct}% oranla Turkiye ortalamasinin ${data.durum}.`;
+                const badgeClass = data.durum === "ustunde" ? "badge-high" : "badge-low";
+                rozetEl.innerHTML = `<span class="badge ${badgeClass}">${data.kullanici_adi}: Turkiye ortalamasinin ${data.durum}</span>`;
+            } catch (e) {
+                notEl.textContent = `Grafik hatasi: ${e.message}`;
+                rozetEl.innerHTML = "";
+            }
+        }
+
+
+        function getSimulationPayload() {
+            const formEl = document.querySelector("form");
+            const formData = new FormData(formEl);
+            const payload = Object.fromEntries(formData.entries());
+            payload.transport_reduction_pct = Number(document.getElementById("transportReduction").value);
+            payload.energy_reduction_pct = Number(document.getElementById("energyReduction").value);
+            payload.food_reduction_pct = Number(document.getElementById("foodReduction").value);
+            return payload;
+        }
+
+        function showSimulatorPanel() {
+            const panel = document.getElementById("simulatorPanel");
+            if (panel) {
+                panel.style.display = "block";
+            }
+        }
+
+        function clearSimulationChart() {
+            if (!aylikChart) return;
+            aylikChart.data.datasets = aylikChart.data.datasets.filter((d) => d.label !== "Simülasyon Tahmini");
+            aylikChart.update();
+        }
+
+        function clearSimulationResult() {
+            const resultEl = document.getElementById("simulationResult");
+            if (resultEl) {
+                resultEl.innerHTML = `<strong>Simülasyon sonucunu görmek için sliderları hareket ettir.</strong>`;
+            }
+            const warn = document.getElementById('simulatorWarning');
+            if (warn) { warn.style.display = 'none'; warn.textContent = ''; }
+            clearSimulationChart();
+        }
+
+        function resetSimulationState() {
+            const transportSlider = document.getElementById('transportReduction');
+            const energySlider = document.getElementById('energyReduction');
+            const foodSlider = document.getElementById('foodReduction');
+            const transportValue = document.getElementById('transportReductionValue');
+            const energyValue = document.getElementById('energyReductionValue');
+            const foodValue = document.getElementById('foodReductionValue');
+
+            if (transportSlider) transportSlider.value = '0';
+            if (energySlider) energySlider.value = '0';
+            if (foodSlider) foodSlider.value = '0';
+            if (transportValue) transportValue.textContent = '0';
+            if (energyValue) energyValue.textContent = '0';
+            if (foodValue) foodValue.textContent = '0';
+            clearSimulationResult();
+        }
+
+        function updateSimulationChart(simValue) {
+            if (!aylikChart) return;
+            const labels = aylikChart.data.labels || [];
+            if (!labels.length) return;
+            const monthlySimValue = Math.round(simValue * 100) / 100;
+            const simData = labels.map(() => monthlySimValue);
+            const existing = aylikChart.data.datasets.find((d) => d.label === "Simülasyon Tahmini");
+            if (existing) {
+                existing.data = simData;
+            } else {
+                aylikChart.data.datasets.push({
+                    type: "line",
+                    label: "Simülasyon Tahmini",
+                    data: simData,
+                    borderColor: "#f97316",
+                    backgroundColor: "rgba(249,115,22,0.15)",
+                    borderDash: [8, 6],
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: "#f97316",
+                    pointBorderColor: "#ffffff",
+                    tension: 0.3,
+                    spanGaps: true,
+                    fill: false,
+                    yAxisID: "y",
+                });
+            }
+            aylikChart.update();
+        }
+
+        let latestSimulationRequestId = 0;
+
+        async function simulateReduction() {
+            const requestId = ++latestSimulationRequestId;
+            try {
+                const payload = getSimulationPayload();
+                const transportPct = Math.max(0, Number(payload.transport_reduction_pct || 0));
+                const energyPct = Math.max(0, Number(payload.energy_reduction_pct || 0));
+                const foodPct = Math.max(0, Number(payload.food_reduction_pct || 0));
+
+                // If no reduction is selected, reset the simulation panel instead of reusing old results.
+                if (transportPct === 0 && energyPct === 0 && foodPct === 0) {
+                    clearSimulationResult();
+                    resetSimulationState();
+                    return;
+                }
+
+                // If all relevant input fields are zero, show warning and don't call API
+                if (!areSimulationInputsNonZero()) {
+                    const warn = document.getElementById('simulatorWarning');
+                    if (warn) {
+                        warn.style.display = 'inline';
+                        warn.textContent = 'Simülasyon için ilgili alanları doldurun veya Otomatik Doldur butonuna tıklayın.';
+                    }
+                    clearSimulationResult();
+                    return;
+                }
+                // clear warning
+                const warn = document.getElementById('simulatorWarning');
+                if (warn) { warn.style.display = 'none'; warn.textContent = ''; }
+                const response = await fetch("/simulate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json();
+                if (requestId !== latestSimulationRequestId) {
+                    return; // ignore stale response
+                }
+                if (!response.ok) {
+                    throw new Error(data.error || "Simülasyon alinamadi.");
+                }
+                const resultEl = document.getElementById("simulationResult");
+                if (resultEl) {
+                    resultEl.innerHTML = `
+                        <strong>Simülasyon Sonucu:</strong><br>
+                        Ulaşım azaltımı: ${data.simulation.transport_reduction_pct}%<br>
+                        Enerji azaltımı: ${data.simulation.energy_reduction_pct}%<br>
+                        Gıda azaltımı: ${data.simulation.food_reduction_pct}%<br>
+                        <strong>Yeni simülasyon tahmini:</strong> ${data.simulation.gelecek_hafta_kg} kgCO2e<br>
+                        <em>Kaynak: ${data.simulation.kaynak}</em>
+                        <hr>
+                        <strong>Kategori Bazlı Etki (kgCO2e):</strong><br>
+                        Ulaşım: ${data.simulation.baseline.transport} → ${data.simulation.reduced.transport} (azaltım: ${data.simulation.delta.transport} kg)<br>
+                        Enerji: ${data.simulation.baseline.energy} → ${data.simulation.reduced.energy} (azaltım: ${data.simulation.delta.energy} kg)<br>
+                        Gıda: ${data.simulation.baseline.food} → ${data.simulation.reduced.food} (azaltım: ${data.simulation.delta.food} kg)<br>
+                    `;
+                    updateSimulationChart(data.simulation.gelecek_hafta_kg);
+                }
+            } catch (e) {
+                const resultEl = document.getElementById("simulationResult");
+                if (resultEl) {
+                    resultEl.innerHTML = `<span class="error">Simülasyon hatasi: ${e.message}</span>`;
+                }
+            }
+        }
+
+        function areSimulationInputsNonZero() {
+            const transportKeys = ["dolmus_km","minibus_km","otobus_km","metro_km","otomobil_km","taksi_km","tren_km","gemi_km","ucak_km"];
+            const energyKeys = ["electricity_kwh","dogalgaz_m3"];
+            const foodKeys = ["kirmizi_et","beyaz_et","balik","sut_urunleri","yumurta","sebzeler","meyveler","giyim","elektronik"];
+            const all = [...transportKeys, ...energyKeys, ...foodKeys];
+            for (const k of all) {
+                const el = document.querySelector(`input[name="${k}"]`);
+                if (el && Number(el.value) > 0) return true;
+            }
+            return false;
+        }
+
+        async function autoFillForSimulation() {
+            try {
+                const response = await fetch('/turkiye_demo_degerleri');
+                const defaults = await response.json();
+                Object.entries(defaults).forEach(([key, value]) => {
+                    const input = document.querySelector(`input[name="${key}"]`);
+                    if (input) {
+                        input.value = value;
+                    }
+                });
+                alert('Türkiye ortalama değerleri dolduruldu!');
+                simulateReduction();
+            } catch (e) {
+                console.error('Demo değerler alınamadı:', e);
+                alert('Türkiye verileri alınırken hata oluştu.');
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById("chatInput");
+            const chatBox = document.getElementById("chatBox");
+            const text = input.value.trim();
+            if (!text) return;
+
+            chatBox.innerHTML += `<div class="msg user"><strong>Sen:</strong> ${text}</div>`;
+            input.value = "";
+
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await response.json();
+                chatBox.innerHTML += `<div class="msg bot"><strong>Bot:</strong> ${data.answer}</div>`;
+            } catch (e) {
+                chatBox.innerHTML += `<div class="msg bot"><strong>Bot:</strong> Su an yanit veremiyorum, sonra tekrar dene.</div>`;
+            }
+
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        async function sendFloatingMessage() {
+            const input = document.getElementById("floatingChatInput");
+            const chatBox = document.getElementById("floatingChatBox");
+            const text = input.value.trim();
+            if (!text) return;
+
+            chatBox.innerHTML += `<div class="msg user"><strong>Sen:</strong> ${text}</div>`;
+            input.value = "";
+
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await response.json();
+                chatBox.innerHTML += `<div class="msg bot"><strong>Bot:</strong> ${data.answer}</div>`;
+            } catch (e) {
+                chatBox.innerHTML += `<div class="msg bot"><strong>Bot:</strong> Su an yanit veremiyorum, sonra tekrar dene.</div>`;
+            }
+
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function toggleChat() {
+            const container = document.getElementById("chatContainer");
+            container.classList.toggle("active");
+        }
+
+        function hazirlaSayisalAlanlar() {
+            const sayisalAlanlar = document.querySelectorAll('input[type="number"]');
+            sayisalAlanlar.forEach((alan) => {
+                alan.addEventListener("focus", () => {
+                    const v = alan.value.trim();
+                    if (v === "0" || v === "0.0" || v === "0.00") {
+                        alan.value = "";
+                    } else {
+                        alan.select();
+                    }
+                });
+                alan.addEventListener("blur", () => {
+                    if (alan.value.trim() === "") {
+                        alan.value = "0";
+                    }
+                });
+            });
+        }
+
+        // Enter key support for floating chat
+        function initSimulationSliderListeners() {
+            const floatingInput = document.getElementById('floatingChatInput');
+            if (floatingInput) {
+                floatingInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        sendFloatingMessage();
+                    }
+                });
+            }
+
+            const originalInput = document.getElementById('chatInput');
+            if (originalInput) {
+                originalInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        sendMessage();
+                    }
+                });
+            }
+
+            const setupSlider = (sliderId, valueId) => {
+                const slider = document.getElementById(sliderId);
+                const value = document.getElementById(valueId);
+                if (!slider || !value) return;
+                const update = () => {
+                    value.textContent = slider.value;
+                    simulateReduction();
+                };
+                slider.addEventListener('input', update);
+                slider.addEventListener('change', update);
+                value.textContent = slider.value;
+            };
+
+            setupSlider('transportReduction', 'transportReductionValue');
+            setupSlider('energyReduction', 'energyReductionValue');
+            setupSlider('foodReduction', 'foodReductionValue');
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSimulationSliderListeners);
+        } else {
+            initSimulationSliderListeners();
+        }
+
+        window.addEventListener("load", () => {
+            otomatikLagDoldur();
+            hazirlaSayisalAlanlar();
+            resetSimulationState();
+        });
+
+        function resetFormValues(defaults) {
+            Object.keys(defaults).forEach((key) => {
+                try {
+                    const el = document.querySelector(`input[name="${key}"]`);
+                    if (el && (el.type === 'number' || el.type === 'text')) {
+                        if (defaults[key] !== undefined && defaults[key] !== null) {
+                            el.value = defaults[key];
+                        }
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            });
+        }
+
+        const defaults = {{ form_data|tojson }};
+        window.addEventListener('DOMContentLoaded', () => resetFormValues(defaults));
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted || (window.performance && window.performance.getEntriesByType('navigation')[0]?.type === 'back_forward')) {
+                resetFormValues(defaults);
+                resetSimulationState();
+            }
+        });
+    </script>
+</body>
+</html>
