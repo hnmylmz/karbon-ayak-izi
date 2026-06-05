@@ -506,6 +506,10 @@ def init_db() -> None:
                 conn.execute(f"ALTER TABLE weekly_history ADD COLUMN {column} REAL NOT NULL DEFAULT 0.0")
         conn.commit()
 
+with app.app_context():
+    # Veritabanı tablolarını otomatik oluştur
+    init_db()
+
 
 def send_verification_email(email_to: str, username: str, token: str) -> bool:
     """Try to send verification email if SMTP settings are configured. Returns True if sent."""
@@ -1713,5 +1717,4 @@ def grafik_veri_api():
 
 
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
