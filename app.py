@@ -6,16 +6,13 @@ import smtplib
 import sys
 from email.message import EmailMessage
 import importlib
+import gc
 
-import joblib
 import numpy as np
-import pandas as pd
-import shap
 from flask import Flask, jsonify, render_template, request, redirect, url_for, flash, session
 
 import constants
 import gida_emisyon_sozlugu
-from hibrit_model_egit import HibritModel
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from markupsafe import Markup
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -885,11 +882,20 @@ def build_shap_analysis(
     model_features: Sequence[str],
     girdi: Mapping[str, float],
 ) -> List[str]:
+    import pandas as pd
+    import shap
+
     x = pd.DataFrame([{f: float(girdi.get(f, 0.0)) for f in model_features}])
     xgb_model = getattr(model, "xgb_model", None)
     if xgb_model is None:
+        del x
+        gc.collect()
         return []
 
+    explainer = None
+    shap_vals = None
+    shap_arr = None
+    shap_row = []
     try:
         explainer = shap.TreeExplainer(xgb_model)
         shap_vals = explainer.shap_values(x)
@@ -899,6 +905,8 @@ def build_shap_analysis(
         else:
             shap_row = shap_arr.flatten().tolist()
     except Exception:
+        del x
+        gc.collect()
         return []
 
     feature_items = []
@@ -945,6 +953,16 @@ def build_shap_analysis(
             article = f"{label} şu anda tahmini artıran bir faktör. Mevcut seviye {comparison}."
             messages.append(article)
 
+    if 'x' in locals():
+        del x
+    if 'explainer' in locals():
+        del explainer
+    if 'shap_vals' in locals():
+        del shap_vals
+    if 'shap_arr' in locals():
+        del shap_arr
+    gc.collect()
+
     return messages
 
 
@@ -965,6 +983,7 @@ def ml_tahmini(
             raise FileNotFoundError(f"Model yolu bulunamadı: {MODEL_PATH}")
 
         import hibrit_model_egit
+        import joblib
         original_main = sys.modules.get("__main__")
         sys.modules["__main__"] = hibrit_model_egit
         try:
@@ -992,6 +1011,9 @@ def ml_tahmini(
         tahmin = float(model.predict(x)[0]) / 1000.0
         analysis = build_shap_analysis(model, model_features, ml_girdi)
         app.logger.info(f"Model başarıyla yüklendi ve tahmin yapıldı: {tahmin:.2f} kgCO2e")
+        del model
+        del model_features
+        gc.collect()
         return {
             "kaynak": "hibrit_model",
             "gelecek_ay_kg": round(max(tahmin, 0.0), 2),
