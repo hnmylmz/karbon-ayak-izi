@@ -7,10 +7,10 @@ WORD_RE = re.compile(r"[a-zA-Z0-9çğıöşüÇĞİÖŞÜ]+")
 
 INTENT_KEYWORDS = {
     "greeting": ["merhaba", "selam", "hey", "iyi", "slm", "mrhb", "halo", "naber", "nasilsin", "selamlar"],
-    "factors": ["katsayi", "faktor", "elektrik", "dolmus", "ulasim", "co2", "emisyon", "deger", "hesaplama", "parametre"],
+    "factors": ["katsayi", "faktor", "elektrik", "dolmus", "ulasim", "gida", "gıda", "beslenme", "yemek", "co2", "emisyon", "deger", "hesaplama", "parametre"],
     "model": ["model", "egit", "xgboost", "tahmin", "ml", "machine learning", "yapay zeka", "ogrenme", "algoritma"],
-    "reduction": ["azalt", "dusur", "oner", "tavsiy", "ne yap", "iyilestir", "nasil azalir", "co2 dusuk", "temiz"],
-    "how_to_use": ["nasil", "kullan", "form", "alan", "site", "hesapla", "calisir", "isleyis", "adimlar"],
+    "reduction": ["azalt", "dusur", "oner", "tavsiy", "ne yap", "iyilestir", "nasil azalir", "co2 dusuk", "temiz", "gida", "gıda", "beslenme", "yemek"],
+    "how_to_use": ["nasil", "kullan", "form", "alan", "site", "hesapla", "calisir", "isleyis", "adimlar", "gida", "gıda", "beslenme", "yemek"],
     "environment": ["cevre", "iklim", "global isinma", "sera gazlari", "karbon", "ekoloji", "doga", "gezegen", "surdurulebilir"],
     "comparison": ["karsilastirma", "fark", "daha iyi", "en iyi", "ortalama", "turkiye", "diger", "kullanici"],
     "technical": ["hata", "sorun", "calismiyor", "api", "veritabani", "database", "log", "debug", "test"],
@@ -19,7 +19,7 @@ INTENT_KEYWORDS = {
     "project": ["proje", "amac", "ne yapar", "kapsam", "ozellik", "neden bu", "neden", "uygulama", "mimari", "kullanim alani", "deploy", "uretim", "prod"],
     "deployment": ["nginx", "gunicorn", "systemd", "deploy", "prod", "ssl", "https", "sertifika", "service", "nginx konfig", "certbot"],
     "auth": ["login", "giris", "kayit", "register", "sifre", "email", "e-posta", "dogrulama", "verify", "token", "session"],
-    "simulation": ["simulasyon", "tahmin", "tahmini", "slider", "azaltim", "gelecek hafta", "simule", "model"],
+    "simulation": ["simulasyon", "tahmin", "tahmini", "slider", "azaltim", "gelecek ay", "gelecek hafta", "simule", "model"],
     "graphics": ["grafik", "grafikler", "cizim", "gorsel", "trend", "diagram", "cizgi", "bar", "karsilastirma", "veri gorsellestirme"],
     "data": ["veri", "kaynak", "dataset", "csv", "kullaniciverisi", "turkiye verisi", "ortalama", "kaynak", "sqlite", "db", "database", "tablo", "modeller"],
     "training": ["egit", "egitim", "egitimi", "train", "xgboost", "ml model", "hibrit", "model dosyasi", "modeller", "feature", "shap"],
@@ -42,18 +42,19 @@ INTENT_RESPONSES = {
         "ML modeli icin `python hibrit_model_egit.py` calistirip `modeller/hibrit_model.joblib` dosyasini olusturmalisin.",
         "Tahmin katmani hibrit MLP + XGBoost modeli kullanir; modeli egittikten sonra uygulama otomatik yukler.",
         "Model hazir degilse sistem fallback tahmin verir, model hazirsa hibrit model sonucu doner.",
-        "Hibrit model gecmis hafta ve girdi ozelliklerini kullanarak gelecek hafta emisyonunu tahmin eder.",
+        "Hibrit model geçmiş ay ve girdi özelliklerini kullanarak gelecek ay emisyonunu tahmin eder.",
     ],
     "reduction": [
-        "En etkili azaltim adimlari genelde otomobil ve ucus kaynakli emisyonu dusurmektir; toplu tasima ve kisa mesafede yurume/bisiklet fark yaratir.",
+        "En etkili azaltim adimlari genelde otomobil, enerji ve gıda kaynakli emisyonu azaltmaktir; toplu tasima, enerji verimliligi ve daha bitkisel beslenme secimleri fark yaratir.",
         "Elektrikte verimli cihaz ve tuketim takibi, ulasimda otomobil yerine metro/otobus secimi toplam emisyonu hizla dusurur.",
         "Onceliklendirme icin once en yuksek kalemi bul: en cok hangi kategori emisyon uretiyorsa ona odaklan.",
-        "Karbon ayak izini azaltmak icin: 1) Ozel arac kullanımını azalt, 2) Enerji verimliligini artir, 3) Yerel urunleri tercih et, 4) Az az ama sik sik.",
+        "Karbon ayak izini azaltmak icin: 1) Ozel arac kullanımını azalt, 2) Enerji verimliliğini artır, 3) Gıda kaynaklarını daha sürdürülebilir seç, 4) Az az ama sık sık.",
     ],
     "how_to_use": [
-        "Formdaki ulasim ve enerji alanlarini doldurup 'Karbon Ayak Izini Hesapla' butonuna basabilirsin.",
-        "Ardindan ML alani icin hafta, sehir kodu ve lag CO2 degerlerini girip tahmini yenileyebilirsin.",
-        "Ilk adimda hesaplama yap, ikinci adimda ayni ekranda gelecek hafta tahminini kontrol et.",
+        "Formdaki ulasim, enerji ve gıda alanlarını doldurup 'Karbon Ayak Izini Hesapla' butonuna basabilirsin.",
+        "Ulasım, enerji ve gıda girdilerini aynı ekranda girmen daha kapsamlı bir değerlendirme sağlar.",
+        "Ardindan ML alani icin ay, sehir kodu ve lag CO2 degerlerini girip tahmini yenileyebilirsin.",
+        "Ilk adimda hesaplama yap, ikinci adimda ayni ekranda gelecek ay tahminini kontrol et.",
         "Adim adim: 1) Bilgilerini gir, 2) Hesapla butonuna tikla, 3) Sonuclari incele, 4) Grafikten karsilastirma yap, 5) AI asistanindan oneri al.",
     ],
     "environment": [
@@ -142,9 +143,9 @@ INTENT_RESPONSES = {
 }
 
 KNOWLEDGE_CHUNKS = [
-    "Bu uygulama iki katmandan olusur: kural motoru anlik CO2 hesabini yapar, ML katmani gelecek haftayi tahmin eder.",
+    "Bu uygulama iki katmandan olusur: kural motoru anlik CO2 hesabini yapar, ML katmani gelecek ayi tahmin eder.",
     "Kural motoru elektrik, dogalgaz, dolmus, otobus, metro, otomobil ve ucak girdilerinden kgCO2e hesaplar.",
-    "Hibrit model MLP + XGBoost bileşimini kullanarak Turkiye emisyon verileriyle egitilir ve gecmis haftalari lag ozellikleri olarak kullanir.",
+    "Hibrit model MLP + XGBoost bileşimini kullanarak Turkiye emisyon verileriyle egitilir ve gecmis ayları lag ozellikleri olarak kullanir.",
     "Model egitimi tamamlandiginda model dosyasi `modeller/hibrit_model.joblib` olarak kaydedilir.",
     "Daha iyi tahmin icin lag_1_co2 ile lag_4_co2 degerlerinin gercek kullanici gecmisinden gelmesi gerekir.",
     "Karbon ayak izi, bir kisinin veya kurulusun faaliyetleri sonucunda atmosfere saldigi sera gazlarinin toplam miktaridir.",

@@ -158,7 +158,7 @@ RULE_FEATURES = [
     "giyim",
     "elektronik",
 ]
-ML_EXTRA_FEATURES = ["hafta", "sehir_kodu", "arac_sahibi", "lag_1_co2", "lag_2_co2", "lag_3_co2", "lag_4_co2"]
+ML_EXTRA_FEATURES = ["ay", "sehir_kodu", "arac_sahibi", "lag_1_co2", "lag_2_co2", "lag_3_co2", "lag_4_co2"]
 SIMULATION_TRANSPORT_FEATURES = [
     "dolmus_km",
     "minibus_km",
@@ -196,7 +196,7 @@ SIMULATION_FOOD_FEATURES = [
     "elektronik",
 ]
 CHAT_STATE = {"turn_count": 0, "last_result": None}
-DEFAULT_LAGS = [42.0, 40.0, 39.0, 41.0]
+DEFAULT_LAGS = [0.0, 0.0, 0.0, 0.0]
 TURKIYE_AYLIK_REFERANS_KG = 120.0
 WEEKS_PER_MONTH = 4.345
 INPUT_FEATURES = RULE_FEATURES + ML_EXTRA_FEATURES
@@ -221,7 +221,7 @@ HISTORY_COLUMNS = [
     "meyveler",
     "giyim",
     "elektronik",
-    "hafta",
+    "ay",
     "sehir_kodu",
     "arac_sahibi",
     "lag_1_co2",
@@ -268,7 +268,7 @@ def build_default_form_data() -> Dict[str, str]:
     form_data["meyveler"] = "5"
     form_data["giyim"] = "1"
     form_data["elektronik"] = "30"
-    form_data["hafta"] = "17"
+    form_data["ay"] = "7"
     form_data["sehir_kodu"] = "0"
     form_data["arac_sahibi"] = "1"
     # Gıda varsayılan değerleri
@@ -281,21 +281,22 @@ def build_default_form_data() -> Dict[str, str]:
     form_data["meyveler"] = "0"
     form_data["giyim"] = "0"
     form_data["elektronik"] = "0"
+    form_data["ay"] = "7"
     # Ek ulaşım özellikleri
     form_data["minibus_km"] = "0"
     form_data["taksi_km"] = "0"
     form_data["tren_km"] = "0"
     form_data["gemi_km"] = "0"
 
-    return with_auto_lags(form_data, "", "")
+    return form_data
 
 
 def build_blank_form_data() -> Dict[str, str]:
     form_data: Dict[str, str] = {f: "0" for f in RULE_FEATURES + ML_EXTRA_FEATURES}
     form_data["ad"] = ""
     form_data["soyad"] = ""
-    form_data["hafta"] = "1"
-    return with_auto_lags(form_data, "", "")
+    form_data["ay"] = "1"
+    return form_data
 
 
 def safe_float(value: Any, default: float = 0.0) -> float:
@@ -357,11 +358,8 @@ def validate_inputs(payload: Mapping[str, Any]) -> None:
 
 
 def convert_monthly_inputs_to_weekly(girdi: Mapping[str, float]) -> Dict[str, float]:
-    """ML modeli haftalik birimlere gore egitildigi icin aylik degerleri haftaliga cevirir."""
-    weekly = dict(girdi)
-    for feature in ["yumurta", "giyim", "elektronik"]:
-        weekly[feature] = round(weekly.get(feature, 0.0) / WEEKS_PER_MONTH, 4)
-    return weekly
+    """Model artık aylık çalıştığı için bu dönüşe gerek yok — girdiyi olduğu gibi döndürür."""
+    return dict(girdi)
 
 
 def clean_user_payload(payload: Mapping[str, Any]) -> Dict[str, float]:
@@ -391,7 +389,11 @@ def parse_identity(data: Mapping[str, Any]) -> Tuple[str, str]:
 
 
 def init_db() -> None:
-    """Haftalik toplam emisyon gecmisini saklamak icin tablo olusturur."""
+    """Geçmiş emisyon kayıtlarını saklamak için tablo oluşturur.
+
+    Not: Tablo adı `weekly_history` legacy adıdır ve gerçekte kullanıcı kayıtları
+    hem aylık hem de birikimli giriş olarak kaydedilebilir.
+    """
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
@@ -466,6 +468,9 @@ def init_db() -> None:
             conn.execute("ALTER TABLE weekly_history ADD COLUMN soyad TEXT NOT NULL DEFAULT ''")
         if "user_id" not in cols:
             conn.execute("ALTER TABLE weekly_history ADD COLUMN user_id INTEGER NULL")
+        # add 'ay' column used by HISTORY_COLUMNS and monthly aggregation
+        if "ay" not in cols:
+            conn.execute("ALTER TABLE weekly_history ADD COLUMN ay TEXT NOT NULL DEFAULT ''")
         for column in [
             "electricity_kwh",
             "dogalgaz_m3",
@@ -602,7 +607,7 @@ def save_weekly_total(ad: str, soyad: str, toplam_kg: float, toplam_ton: float, 
 
 
 def get_last_weekly_totals(ad: str = "", soyad: str = "", user_id: int = None, limit: int = 4) -> List[float]:
-    """Son N haftalik toplam emisyonu (yeniden eskiye) doner."""
+    """Son N kayıtlı toplam emisyonu (yeniden eskiye) döner."""
     with sqlite3.connect(DB_PATH) as conn:
         if user_id is not None:
             rows = conn.execute(
@@ -671,21 +676,48 @@ def get_turkiye_benchmark(month_labels: Sequence[str]) -> List[float]:
     return values
 
 
+def get_default_monthly_lags(limit: int = 4) -> List[float]:
+    """Return default monthly lag values for the last `limit` months."""
+    today = datetime.now()
+    labels: List[str] = []
+    for i in range(limit):
+        month_offset = limit - 1 - i
+        year = today.year
+        month = today.month - month_offset
+        while month <= 0:
+            month += 12
+            year -= 1
+        labels.append(f"{year}-{month:02d}")
+    return list(reversed(get_turkiye_benchmark(labels)))
+
+
 def with_auto_lags(form_data: Dict[str, str], ad: str, soyad: str, user_id: int = None) -> Dict[str, str]:
-    """Lag alanlarini DB'deki son kayitlarla otomatik doldurur."""
+    """Lag alanlarini kullanicinin son aylik toplamlarina gore doldurur.
+
+    Bu fonksiyon aylik ozetleri (`get_monthly_user_totals`) kullanir. Donen
+    degerler en yeni ay icin `lag_1_co2`, bir onceki ay icin `lag_2_co2` vb.
+    olarak atanir. Eger aylik ozet yoksa laglar 0.00 olarak kalir.
+    """
+    monthly = []
     if user_id is not None:
-        last_values = get_last_weekly_totals(user_id=user_id, limit=4)
+        monthly = get_monthly_user_totals(user_id=user_id, limit=4)
     elif ad and soyad:
-        last_values = get_last_weekly_totals(ad, soyad, limit=4)
+        monthly = get_monthly_user_totals(ad, soyad, limit=4)
     else:
-        last_values = []
+        monthly = []
+
+    # `get_monthly_user_totals` returns rows oldest->newest; reverse to have newest first
+    last_values: List[float] = []
+    if monthly:
+        vals = [row.get("toplam", 0.0) for row in monthly]
+        last_values = list(reversed(vals))
 
     for i in range(4):
         key = f"lag_{i+1}_co2"
         if i < len(last_values):
             form_data[key] = f"{last_values[i]:.2f}"
         else:
-            form_data[key] = f"{DEFAULT_LAGS[i]:.2f}"
+            form_data[key] = f"{0.0:.2f}"
     return form_data
 
 
@@ -788,7 +820,7 @@ def _apply_input_multiplier(girdi: Mapping[str, float], multiplier: float) -> Di
 def _descale_results(sonuc: Dict[str, Any], tahmin: Dict[str, Any], multiplier: float) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Divide model outputs by multiplier to return to user-scale.
 
-    Modifies toplam_kg, toplam_ton and kalemler values, and ML gelecek_hafta_kg.
+    Modifies toplam_kg, toplam_ton and kalemler values, and ML gelecek_ay_kg.
     """
     if multiplier == 1:
         return sonuc, tahmin
@@ -806,8 +838,8 @@ def _descale_results(sonuc: Dict[str, Any], tahmin: Dict[str, Any], multiplier: 
     # Descale ML tahmin
     try:
         d_tahmin = deepcopy(tahmin)
-        if "gelecek_hafta_kg" in d_tahmin:
-            d_tahmin["gelecek_hafta_kg"] = round(float(d_tahmin.get("gelecek_hafta_kg", 0.0)) / multiplier, 2)
+        if "gelecek_ay_kg" in d_tahmin:
+            d_tahmin["gelecek_ay_kg"] = round(float(d_tahmin.get("gelecek_ay_kg", 0.0)) / multiplier, 2)
     except Exception:
         d_tahmin = tahmin
 
@@ -838,6 +870,7 @@ def feature_label(feature_name: str) -> str:
         "dogalgaz_m3": "Doğalgaz kullanımı",
         "arac_sahibi": "Araç sahibi olma durumu",
         "hafta": "Hafta numarası",
+        "ay": "Ay numarası",
         "sehir_kodu": "Şehir kodu",
     }
     return labels.get(feature_name, feature_name.replace("_", " ").capitalize())
@@ -902,7 +935,7 @@ def build_shap_analysis(
             )
         elif feature.startswith("lag_"):
             messages.append(
-                f"Geçmiş haftalardaki {label} yüksek; geçmiş değerler tahmini yukarı çekiyor. Daha istikrarlı azalma için bu trende dikkat edin."
+                f"Geçmiş aylardaki {label} yüksek; geçmiş değerler tahmini yukarı çekiyor. Daha istikrarlı azalma için bu trende dikkat edin."
             )
         else:
             article = f"{label} şu anda tahmini artıran bir faktör. Mevcut seviye {comparison}."
@@ -918,7 +951,7 @@ def ml_tahmini(
 ) -> Dict[str, Any]:
     """
     ML katmani:
-    - Hibrit MLP + XGBoost modeli ile gelecek hafta emisyonunu tahmin eder.
+    - Hibrit MLP + XGBoost modeli ile gelecek ay emisyonunu tahmin eder.
     - Model yoksa kural motoru sonucunu baz alarak fallback deger dondurur.
     - Gerçek model veri kümesi gram cinsinden çıkış üretiyor; burada kg cinsine çeviriyoruz.
     """
@@ -957,7 +990,7 @@ def ml_tahmini(
         app.logger.info(f"Model başarıyla yüklendi ve tahmin yapıldı: {tahmin:.2f} kgCO2e")
         return {
             "kaynak": "hibrit_model",
-            "gelecek_hafta_kg": round(max(tahmin, 0.0), 2),
+            "gelecek_ay_kg": round(max(tahmin, 0.0), 2),
             "analysis": analysis,
         }
     except Exception as exc:
@@ -965,7 +998,7 @@ def ml_tahmini(
 
     return {
         "kaynak": "fallback",
-        "gelecek_hafta_kg": round(max(kural_sonucu.get("toplam_kg", 0.0), 0.0), 2),
+        "gelecek_ay_kg": round(max(kural_sonucu.get("toplam_kg", 0.0), 0.0), 2),
         "analysis": [],
     }
 
@@ -977,7 +1010,7 @@ def uretilen_aksiyon_mesaji(
     Kural sonucu + ML tahmini uzerinden kullaniciya aksiyon odakli yorum uretir.
     """
     toplam = float(sonuc["toplam_kg"])
-    gelecek = float(tahmin["gelecek_hafta_kg"])
+    gelecek = float(tahmin.get("gelecek_ay_kg", tahmin.get("gelecek_hafta_kg", 0.0)))
     kalemler = sonuc.get("kalemler", {})
     en_yuksek_kalem = max(kalemler, key=kalemler.get) if kalemler else ""
     en_yuksek_deger = float(kalemler.get(en_yuksek_kalem, 0.0))
@@ -1365,6 +1398,45 @@ def tahmin_api():
 
 
 
+@app.post('/api/auto_fill_lags')
+@limiter.limit("10 per minute")
+def api_auto_fill_lags():
+    """Return last 4 monthly totals for lag auto-fill.
+
+    If the user is authenticated, use their `user_id`. Otherwise the client
+    may send `ad` and `soyad` in JSON to try to resolve historic totals.
+    """
+    payload = request.get_json(silent=True) or {}
+    monthly = []
+    if current_user and getattr(current_user, 'is_authenticated', False):
+        try:
+            monthly = get_monthly_user_totals(user_id=current_user.id, limit=4)
+        except Exception:
+            monthly = []
+    else:
+        ad = str(payload.get('ad', '')).strip()
+        soyad = str(payload.get('soyad', '')).strip()
+        if ad and soyad:
+            try:
+                monthly = get_monthly_user_totals(ad, soyad, limit=4)
+            except Exception:
+                monthly = []
+
+    # monthly is oldest->newest; reverse to get newest first
+    last_values = []
+    if monthly and any(float(row.get('toplam', 0.0)) > 0 for row in monthly):
+        last_values = list(reversed([row.get('toplam', 0.0) for row in monthly]))
+    else:
+        last_values = get_default_monthly_lags(4)
+
+    result = {}
+    for i in range(4):
+        key = f'lag_{i+1}_co2'
+        result[key] = round(last_values[i], 2) if i < len(last_values) else 0.0
+
+    return jsonify(result)
+
+
 @app.route('/register', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
 def register():
@@ -1505,8 +1577,8 @@ def simulate_api():
                     "energy_reduction_pct": energy_pct,
                     "food_reduction_pct": food_pct,
                     "kaynak": "kural_model",
-                    "gelecek_hafta_kg": round(sonuc.get("toplam_kg", 0.0), 2),
-                    "ml_gelecek_hafta_kg": tahmin.get("gelecek_hafta_kg"),
+                    "gelecek_ay_kg": round(sonuc.get("toplam_kg", 0.0), 2),
+                    "ml_gelecek_ay_kg": tahmin.get("gelecek_ay_kg", tahmin.get("gelecek_hafta_kg")),
                     "toplam_kg": sonuc["toplam_kg"],
                     "toplam_ton": sonuc["toplam_ton"],
                     "baseline": {
@@ -1548,7 +1620,7 @@ def verify_user(token):
 
 @app.get("/laglar")
 def laglar_api():
-    # Prefer authenticated user's history
+    # Prefer authenticated user's monthly history
     user_id = None
     if current_user and getattr(current_user, "is_authenticated", False):
         user_id = int(current_user.id)
@@ -1559,19 +1631,36 @@ def laglar_api():
         soyad = str(request.args.get("soyad", "")).strip()
 
     if user_id is None and not (ad and soyad):
+        defaults = get_default_monthly_lags(4)
         return jsonify(
             {
-                "lag_1_co2": DEFAULT_LAGS[0],
-                "lag_2_co2": DEFAULT_LAGS[1],
-                "lag_3_co2": DEFAULT_LAGS[2],
-                "lag_4_co2": DEFAULT_LAGS[3],
+                "lag_1_co2": round(defaults[0], 2),
+                "lag_2_co2": round(defaults[1], 2),
+                "lag_3_co2": round(defaults[2], 2),
+                "lag_4_co2": round(defaults[3], 2),
             }
         )
 
-    last_values = get_last_weekly_totals(ad, soyad, user_id=user_id, limit=4)
-    # ignore any zero-valued historical totals (likely placeholder rows)
-    last_values = [float(v) for v in last_values if float(v) and float(v) > 0]
+    # use monthly aggregates for lag values
+    if user_id is not None:
+        monthly = get_monthly_user_totals(user_id=user_id, limit=4)
+    else:
+        monthly = get_monthly_user_totals(ad, soyad, limit=4)
+
+    # monthly returned oldest->newest; reverse to have newest first
+    vals = [row.get('toplam', 0.0) for row in monthly] if monthly else []
+    last_values = [float(v) for v in reversed(vals) if float(v) and float(v) > 0]
+
     lag_map = {}
+    if last_values:
+        computed = list(reversed([float(row.get('toplam', 0.0)) for row in monthly]))
+        if any(v > 0 for v in computed):
+            last_values = computed
+        else:
+            last_values = get_default_monthly_lags(4)
+    else:
+        last_values = get_default_monthly_lags(4)
+
     for i in range(4):
         lag_map[f"lag_{i+1}_co2"] = round(last_values[i], 2) if i < len(last_values) else DEFAULT_LAGS[i]
     return jsonify(lag_map)

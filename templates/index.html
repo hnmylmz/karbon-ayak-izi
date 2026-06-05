@@ -535,8 +535,8 @@
                     <h3>🤖 ML Model Parametreleri</h3>
                     <div class="grid">
                         <div>
-                            <label>Hafta (1-52)</label>
-                            <input type="number" min="1" max="52" step="1" name="hafta" value="{{ form_data.hafta }}" required>
+                            <label>Ay (1-12)</label>
+                            <input type="number" min="1" max="12" step="1" name="ay" value="{{ form_data.ay }}" required>
                         </div>
                         <div>
                             <label>Arac Sahibi (0/1)</label>
@@ -620,7 +620,7 @@
                 <div id="sonucPaneli" class="result">
                     <strong>Kullanici:</strong> {{ sonuc_kisi }}<br>
                     <strong>Kural Motoru Toplam:</strong> {{ sonuc.toplam_kg }} kgCO2e ({{ sonuc.toplam_ton }} tonCO2e)<br>
-                    <strong>ML Gelecek Hafta Tahmini:</strong> {{ tahmin.gelecek_hafta_kg }} kgCO2e (Kaynak: {{ tahmin.kaynak }})
+                    <strong>ML Gelecek Ay Tahmini:</strong> {{ tahmin.gelecek_ay_kg }} kgCO2e (Kaynak: {{ tahmin.kaynak }})
                     <div class="chips">
                         {% for ad, deger in sonuc.kalemler.items() %}
                             <span class="chip">{{ ad }}: {{ deger }} kg</span>
@@ -630,8 +630,30 @@
                         <hr>
                         <strong>ML Yorum:</strong> {{ aksiyon.analiz }}
                         {% if aksiyon.bolum_onerileri %}
+                            {# Render Genel first, then Enerji, Ulaşım, Gıda, then any remaining categories #}
+                            {% if aksiyon.bolum_onerileri.get('Genel') %}
+                                <h4 style="margin:10px 12px 2px;">Genel Önerileri</h4>
+                                <ul style="margin:8px 0 0 18px; padding:0;">
+                                    {% for madde in aksiyon.bolum_onerileri.get('Genel') %}
+                                        <li>{{ madde }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+
+                            {% for key in ['Enerji','Ulaşım','Gıda'] %}
+                                {% if aksiyon.bolum_onerileri.get(key) %}
+                                    <h4 style="margin:10px 12px 2px;">{{ key }} Önerileri</h4>
+                                    <ul style="margin:8px 0 0 18px; padding:0;">
+                                        {% for madde in aksiyon.bolum_onerileri.get(key) %}
+                                            <li>{{ madde }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                            {% endfor %}
+
+                            {# Render any remaining categories that were not in the prioritized list #}
                             {% for kategori, maddeler in aksiyon.bolum_onerileri.items() %}
-                                {% if maddeler %}
+                                {% if kategori not in ['Genel','Enerji','Ulaşım','Gıda'] and maddeler %}
                                     <h4 style="margin:10px 12px 2px;">{{ kategori }} Önerileri</h4>
                                     <ul style="margin:8px 0 0 18px; padding:0;">
                                         {% for madde in maddeler %}
@@ -773,12 +795,21 @@
 
         async function otomatikLagDoldur() {
             try {
-                const response = await fetch(`/laglar`);
-                const laglar = await response.json();
+                const response = await fetch(`/laglar`, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                });
+                const contentType = response.headers.get('content-type') || '';
                 if (!response.ok) {
-                    throw new Error("Lag degerleri alinamadi.");
+                    const text = await response.text();
+                    throw new Error(`Lag degerleri alinamadi (${response.status}): ${text}`);
+                }
+                if (!contentType.includes('application/json')) {
+                    const text = await response.text();
+                    throw new Error(`Beklenmeyen yanit turu: ${text.slice(0, 200)}`);
                 }
 
+                const laglar = await response.json();
                 document.querySelector('input[name="lag_1_co2"]').value = laglar.lag_1_co2 ?? 0;
                 document.querySelector('input[name="lag_2_co2"]').value = laglar.lag_2_co2 ?? 0;
                 document.querySelector('input[name="lag_3_co2"]').value = laglar.lag_3_co2 ?? 0;
@@ -810,7 +841,7 @@
                     <h2>📌 Kayıt Detayı</h2>
                     <p><strong>Tarih:</strong> ${data.created_at}</p>
                     <p><strong>Kural Motoru Toplam:</strong> ${data.kural.toplam_kg} kgCO2e (${data.kural.toplam_ton} tonCO2e)</p>
-                    <p><strong>ML Gelecek Hafta Tahmini:</strong> ${data.tahmin.gelecek_hafta_kg} kgCO2e (Kaynak: ${data.tahmin.kaynak})</p>
+                    <p><strong>ML Gelecek Ay Tahmini:</strong> ${data.tahmin.gelecek_ay_kg} kgCO2e (Kaynak: ${data.tahmin.kaynak})</p>
                     <div class="chips">${chipHtml}</div>
                     <hr>
                     <strong>ML Yorum:</strong> ${data.aksiyon.analiz}
@@ -1048,7 +1079,7 @@
                         Ulaşım azaltımı: ${data.simulation.transport_reduction_pct}%<br>
                         Enerji azaltımı: ${data.simulation.energy_reduction_pct}%<br>
                         Gıda azaltımı: ${data.simulation.food_reduction_pct}%<br>
-                        <strong>Yeni simülasyon tahmini:</strong> ${data.simulation.gelecek_hafta_kg} kgCO2e<br>
+                        <strong>Yeni simülasyon tahmini:</strong> ${data.simulation.gelecek_ay_kg} kgCO2e<br>
                         <em>Kaynak: ${data.simulation.kaynak}</em>
                         <hr>
                         <strong>Kategori Bazlı Etki (kgCO2e):</strong><br>
@@ -1056,7 +1087,7 @@
                         Enerji: ${data.simulation.baseline.energy} → ${data.simulation.reduced.energy} (azaltım: ${data.simulation.delta.energy} kg)<br>
                         Gıda: ${data.simulation.baseline.food} → ${data.simulation.reduced.food} (azaltım: ${data.simulation.delta.food} kg)<br>
                     `;
-                    updateSimulationChart(data.simulation.gelecek_hafta_kg);
+                    updateSimulationChart(data.simulation.gelecek_ay_kg);
                 }
             } catch (e) {
                 const resultEl = document.getElementById("simulationResult");
@@ -1149,6 +1180,31 @@
             container.classList.toggle("active");
         }
 
+        // Close the floating chat when user clicks anywhere outside it
+        document.addEventListener('click', function (e) {
+            try {
+                const container = document.getElementById('chatContainer');
+                if (!container) return;
+                if (!container.classList.contains('active')) return;
+                // if the click happened inside the chat widget, do nothing
+                if (e.target.closest && e.target.closest('.chat-widget')) return;
+                // otherwise close the chat
+                container.classList.remove('active');
+            } catch (err) {
+                console.warn('chat close handler error', err);
+            }
+        }, true);
+
+        // Allow Escape key to close the chat
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                const container = document.getElementById('chatContainer');
+                if (container && container.classList.contains('active')) {
+                    container.classList.remove('active');
+                }
+            }
+        });
+
         function hazirlaSayisalAlanlar() {
             const sayisalAlanlar = document.querySelectorAll('input[type="number"]');
             sayisalAlanlar.forEach((alan) => {
@@ -1213,9 +1269,15 @@
         }
 
         window.addEventListener("load", () => {
-            otomatikLagDoldur();
             hazirlaSayisalAlanlar();
             resetSimulationState();
+            {% if current_user and current_user.is_authenticated %}
+            try {
+                grafikYukle();
+            } catch (e) {
+                console.warn('Grafik yüklenemedi:', e);
+            }
+            {% endif %}
         });
 
         function resetFormValues(defaults) {

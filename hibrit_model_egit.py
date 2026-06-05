@@ -19,7 +19,7 @@ import shap
 
 MODEL_DIR = Path("modeller")
 HYBRID_MODEL_PATH = MODEL_DIR / "hibrit_model.joblib"
-XGB_MODEL_PATH = MODEL_DIR / "xgb_haftalik_model.joblib"
+XGB_MODEL_PATH = MODEL_DIR / "xgb_aylik_model.joblib"
 MLP_MODEL_PATH = MODEL_DIR / "mlp_model.joblib"
 SCALER_PATH = MODEL_DIR / "hybrid_scaler.joblib"
 FEATURES_PATH = MODEL_DIR / "hybrid_features.joblib"
@@ -51,10 +51,10 @@ def hazirla_turkiye_verisi() -> pd.DataFrame:
     print(f"📊 Gerçek veri: {len(df)} kayıt, sütunlar: {list(df.columns)}")
 
     expected = [
-        'user_id', 'hafta', 'dolmus_km', 'otobus_km', 'metro_km',
-        'otomobil_km', 'ucak_km', 'haftalik_co2_kg', 'sehir_kodu',
+        'user_id', 'ay', 'dolmus_km', 'otobus_km', 'metro_km',
+        'otomobil_km', 'ucak_km', 'aylik_co2_kg', 'sehir_kodu',
         'arac_sahibi', 'lag_1_co2', 'lag_2_co2', 'lag_3_co2',
-        'lag_4_co2', 'target_next_week_co2'
+        'lag_4_co2', 'target_next_month_co2'
     ]
     missing = [col for col in expected if col not in df.columns]
     if missing:
@@ -64,19 +64,19 @@ def hazirla_turkiye_verisi() -> pd.DataFrame:
 
 
 def hazirla_ogrenme_tablosu(ham_df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
-    """Gecmis haftalardan gelecek hafta CO2 tahmini icin supervised tablo uretir"""
-    df = ham_df.sort_values(["user_id", "hafta"]).copy()
+    """Geçmiş aylardan gelecek ay CO2 tahmini için supervised tablo üretir"""
+    df = ham_df.sort_values(["user_id", "ay"]).copy()
     df = engineer_features(df)
     
     # NaN değerleri temizle
-    df = df.dropna(subset=['target_next_week_co2'])
+    df = df.dropna(subset=['target_next_month_co2'])
     
     # Lag değerlerindeki NaN değerleri temizle
     lag_cols = ['lag_1_co2', 'lag_2_co2', 'lag_3_co2', 'lag_4_co2']
     df = df.dropna(subset=lag_cols)
     
     feature_cols = [
-        'user_id', 'hafta', 'sehir_kodu', 'arac_sahibi',
+        'ay', 'sehir_kodu', 'arac_sahibi',
         'dolmus_km', 'otobus_km', 'metro_km', 'otomobil_km', 'ucak_km',
         'transport_total_km', 'lag_mean_co2', 'lag_std_co2', 'lag_trend',
         'lag_1_co2', 'lag_2_co2', 'lag_3_co2', 'lag_4_co2'
@@ -116,8 +116,8 @@ class HibritModel:
             X_valid_fold = X.iloc[valid_idx]
 
             xgb_fold = XGBRegressor(
-                n_estimators=300,
-                max_depth=6,
+                n_estimators=600,
+                max_depth=8,
                 learning_rate=0.03,
                 subsample=0.80,
                 colsample_bytree=0.80,
@@ -156,8 +156,8 @@ class HibritModel:
     def _fit_base_learners(self, X: pd.DataFrame, y: pd.Series) -> None:
         print("🤖 Temel XGBoost modeli eğitiliyor...")
         self.xgb_model = XGBRegressor(
-            n_estimators=300,
-            max_depth=6,
+            n_estimators=600,
+            max_depth=8,
             learning_rate=0.03,
             subsample=0.80,
             colsample_bytree=0.80,
@@ -174,14 +174,14 @@ class HibritModel:
         self.scaler.fit(X)
         X_scaled = self.scaler.transform(X)
         self.mlp_model = MLPRegressor(
-            hidden_layer_sizes=(100, 50, 25),
+            hidden_layer_sizes=(200, 100, 50),
             activation='relu',
             solver='adam',
             alpha=0.001,
             batch_size=32,
             learning_rate='adaptive',
             learning_rate_init=0.001,
-            max_iter=500,
+            max_iter=700,
             random_state=42,
             early_stopping=True,
             validation_fraction=0.1,
@@ -239,14 +239,14 @@ def hibrit_model_egit():
     df_sentetik = hazirla_turkiye_verisi()
     ogrenme_df, feature_cols = hazirla_ogrenme_tablosu(df_sentetik)
 
-    train_df = ogrenme_df[ogrenme_df['hafta'] <= 17].copy()
-    test_df = ogrenme_df[ogrenme_df['hafta'] > 17].copy()
+    train_df = ogrenme_df[ogrenme_df['ay'] <= 17].copy()
+    test_df = ogrenme_df[ogrenme_df['ay'] > 17].copy()
 
     x_train = train_df[feature_cols]
-    y_train = train_df['target_next_week_co2']
+    y_train = train_df['target_next_month_co2']
     groups = train_df['user_id']
     x_test = test_df[feature_cols]
-    y_test = test_df['target_next_week_co2']
+    y_test = test_df['target_next_month_co2']
 
     print(f"📊 Eğitim seti: {len(x_train)} örnek")
     print(f"📊 Test seti: {len(x_test)} örnek")
@@ -266,13 +266,13 @@ def hibrit_model_egit():
     mae_mlp = mean_absolute_error(y_test, individual_preds['mlp'])
 
     print(f"\n📈 HİBRİT STACKING MODEL PERFORMANSI:")
-    print(f"  MAE: {mae_hybrid:.3f} kg CO2/hafta")
+    print(f"  MAE: {mae_hybrid:.3f} kg CO2/ay")
     print(f"  MSE: {mse_hybrid:.3f}")
     print(f"  R²: {r2_hybrid:.4f}")
 
     print(f"\n📈 BİREYSEL BASE LEARNER PERFORMANSI:")
-    print(f"  XGBoost MAE: {mae_xgb:.3f} kg CO2/hafta")
-    print(f"  MLP MAE: {mae_mlp:.3f} kg CO2/hafta")
+    print(f"  XGBoost MAE: {mae_xgb:.3f} kg CO2/ay")
+    print(f"  MLP MAE: {mae_mlp:.3f} kg CO2/ay")
     if mae_xgb > 0:
         improvement_pct = (mae_xgb - mae_hybrid) / mae_xgb * 100
         print(f"  Önceki XGBoost ile karşılaştırma: %{improvement_pct:.2f} iyileşme")
@@ -292,5 +292,5 @@ def hibrit_model_egit():
 if __name__ == "__main__":
     hibrit_model, mae, r2 = hibrit_model_egit()
     print(f"\n🎉 HİBRİT STACKING MODEL EĞİTİMİ TAMAMLANDI!")
-    print(f"📊 Final MAE: {mae:.3f} kg CO2/hafta")
+    print(f"📊 Final MAE: {mae:.3f} kg CO2/ay")
     print(f"📊 Final R²: {r2:.4f}")

@@ -5,7 +5,7 @@ Bu proje Flask tabanlı bir web uygulamasıdır. Kullanıcılar kayıt olup giri
 Önemli özellikler:
 - Kullanıcı kayıt/giriş (parola hash ile saklanır)
 - E-posta doğrulama token'ı (SMTP yapılandırılmışsa otomatik gönderim)
-- Kullanıcıya bağlı geçmiş kayıtlar (`weekly_history.user_id`)
+- Kullanıcıya bağlı geçmiş kayıtlar (`weekly_history.user_id`) — tablo adı legacy niteliktedir, uygulama artık aylık toplamlar üzerinden hesap yapar
 - Basit rate-limiting, session güvenlik ayarları ve dotenv desteği
 
 Hızlı başlangıç (yerel geliştirme):
@@ -38,6 +38,10 @@ python app.py
 ```
 
 5. Tarayıcıda açın: `http://localhost:5000`
+
+Veri kaynakları
+- Uygulama kendisi doğrudan `data/turkiye_emisyon.csv` ve `data/turkiye_emisyon_temiz.csv` dosyalarını kullanır.
+- `veri_kaynaklari.md` yalnızca dokümantasyon amaçlıdır; kodda doğrudan okunmaz.
 
 Test kullanıcı
 - Geliştirme için oluşturulmuş test kullanıcı: `testuser / secret`. Üretimde bu kullanıcıyı silin.

@@ -1,9 +1,10 @@
 # 🌍 Karbon Ayak İzi Veri Kaynakları
 
 ## 📊 Mevcut Durum
-- **Veri Seti:** `archive/sentetik/sentetik_tr_ulasim_haftalik_temiz.csv` (2700 kayıt)
-- **Kapsam:** 120 kullanıcı × 20 hafta + 300 ek kayıt
-- **Özellikler:** Ulaşım verileri, şehir bilgisi, CO2 emisyonları
+- **Veri Seti:** `data/turkiye_emisyon.csv` ve türetilmiş `data/turkiye_emisyon_temiz.csv`
+- **Kapsam:** Gerçek Türkiye emisyon verileri kullanılarak oluşturulmuş aylık sentetik eğitim verisi
+- **Özellikler:** Ulaşım, enerji ve gıda etkileri için aylık CO2 tahmin verisi
+- **Not:** `archive/sentetik/sentetik_tr_ulasim_haftalik_temiz.csv` eski dokümantasyon referansıdır; proje kodunda doğrudan kullanılmıyor.
 
 ## 🎯 Ek Veri Kaynakları
 

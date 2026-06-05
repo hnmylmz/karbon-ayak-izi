@@ -9,16 +9,16 @@ from xgboost import XGBRegressor
 from veriler import EMISSION_FACTORS_TR
 
 MODEL_DIR = Path("modeller")
-MODEL_PATH = MODEL_DIR / "xgb_haftalik_model.joblib"
-FEATURES_PATH = MODEL_DIR / "xgb_haftalik_features.joblib"
+MODEL_PATH = MODEL_DIR / "xgb_aylik_model.joblib"
+FEATURES_PATH = MODEL_DIR / "xgb_aylik_features.joblib"
 DATASET_PATH = Path("data/turkiye_emisyon_temiz.csv")
 
 TRANSPORT_COLUMNS = ["dolmus_km", "otobus_km", "metro_km", "otomobil_km", "ucak_km"]
 LAG_COUNT = 4
 
 
-def _haftalik_ulasim_co2(row: pd.Series) -> float:
-    """Sadece ulasim kalemlerinden haftalik kgCO2e hesabi."""
+def _transport_co2(row: pd.Series) -> float:
+    """Sadece ulaşım kalemlerinden CO2 kg cinsinden hesaplar."""
     return (
         row["dolmus_km"] * EMISSION_FACTORS_TR["dolmus_kg_per_km"]
         + row["otobus_km"] * EMISSION_FACTORS_TR["otobus_kg_per_km"]
@@ -31,7 +31,8 @@ def _haftalik_ulasim_co2(row: pd.Series) -> float:
 def hazirla_turkiye_emisyon_verisi(n_kullanici=120, hafta_sayisi=20, seed=42):
     """
     Türkiye'nin gerçek emisyon verilerini kullanarak sentetik veri seti hazırlar.
-    EDGAR Power Industry ve Transport verilerini kullanır.
+    Bu fonksiyon eski haftalık referans modele dayanan legacy bir üretim akışıdır.
+    Güncel aylık eğitim akışı `train_turkiye_model()` fonksiyonunda yer almaktadır.
     """
     print("🇹🇷 TÜRKİYE GERÇEK EMİSYON VERİLERİYLE SENTETİK SETİ HAZIRLANIYOR...")
 
@@ -101,12 +102,12 @@ def hazirla_turkiye_emisyon_verisi(n_kullanici=120, hafta_sayisi=20, seed=42):
     print(f"🚌 Ortalama haftalık ulaşım: {df_sentetik[['dolmus_km', 'otobus_km', 'metro_km', 'otomobil_km', 'ucak_km']].sum(axis=1).mean():.1f} km")
     print(f"📈 Ortalama haftalık CO2: {df_sentetik['haftalik_co2_kg'].mean():.2f} kg")
 
-    df_sentetik["haftalik_co2_kg"] = df_sentetik.apply(_haftalik_ulasim_co2, axis=1).round(3)
+    df_sentetik["haftalik_co2_kg"] = df_sentetik.apply(_transport_co2, axis=1).round(3)
     return df_sentetik
 
 
 def ogrenme_tablosu_hazirla(ham_df: pd.DataFrame):
-    """Gecmis haftalardan gelecek hafta CO2 tahmini icin supervised tablo uretir."""
+    """Geçmiş zaman dilimlerinden geleceğe yönelik CO2 tahmini için supervised tablo üretir."""
     df = ham_df.sort_values(["user_id", "hafta"]).copy()
     df["sehir_kodu"] = df["sehir"].astype("category").cat.codes
 
@@ -128,7 +129,7 @@ def modeli_egit_ve_kaydet():
     ham_df = hazirla_referans_tr_ulasim_verisi(n_kullanici=120, hafta_sayisi=20, seed=42)
     ogrenme_df, feature_cols = ogrenme_tablosu_hazirla(ham_df)
 
-    # Zamansal dagilim: son 3 hafta test, geri kalani egitim.
+    # LEGACY: Bu bölüm eski haftalık referans verisiyle model eğitimi için kalmıştır.
     train_df = ogrenme_df[ogrenme_df["hafta"] <= 16]
     test_df = ogrenme_df[ogrenme_df["hafta"] > 16]
 
@@ -202,57 +203,78 @@ def train_turkiye_model():
     print(f"  Otomobil: {otomobil_factor:.6f} kg CO2/km")
     print(f"  Uçak: {ucak_factor:.6f} kg CO2/km")
     
-    # Kullanıcı bazında sentetik verisi oluştur
+    # Kullanıcı bazında sentetik verisi oluştur (AYLIK)
     sentetik_veriler = []
-    
-    for user_id in range(1, 121):  # 120 kullanıcı
+
+    # Tek bir RNG kullan ve tekrarları kontrol et
+    rng = np.random.default_rng(42)
+
+    # Aylık ölçeğe çevirme katsayısı
+    WEEKS_PER_MONTH = 4.345
+    monthly_transport_km = weekly_transport_km * WEEKS_PER_MONTH
+
+    for user_id in range(1, 301):  # 300 kullanıcı
         user_data = []
-        
-        for hafta in range(1, 21):  # 20 hafta
-            # Haftalık ulaşım verileri
-            dolmus_km = int(np.random.normal(weekly_transport_km * 0.25, weekly_transport_km * 0.15))
-            otobus_km = int(np.random.normal(weekly_transport_km * 0.35, weekly_transport_km * 0.20))
-            metro_km = int(np.random.normal(weekly_transport_km * 0.20, weekly_transport_km * 0.15))
-            otomobil_km = int(np.random.normal(weekly_transport_km * 0.15, weekly_transport_km * 0.10))
-            ucak_km = int(np.random.exponential(scale=50)) if np.random.random() > 0.95 else 0
-            
-            # Haftalık CO2 emisyonu
-            haftalik_co2_kg = round(
+
+        # Bu kullanıcı için bir "Ana Profil (Baseline)" oluştur (aylık ortalama km)
+        dolmus_base = monthly_transport_km * rng.uniform(0.25, 0.45)
+        otobus_base = monthly_transport_km * rng.uniform(0.30, 0.50)
+        metro_base = monthly_transport_km * rng.uniform(0.15, 0.25)
+        otomobil_base = monthly_transport_km * rng.uniform(0.05, 0.20)
+        ucak_base = rng.uniform(0, 50)
+
+        for ay in range(1, 31):  # 30 ay
+            # Aylık değerleri baseline üzerine %3-%6 arası küçük sapma ile oluştur
+            def apply_pct_noise(base):
+                pct = rng.uniform(0.03, 0.06)
+                if rng.random() < 0.5:
+                    pct = -pct
+                val = base * (1.0 + pct)
+                return max(0, int(round(val)))
+
+            dolmus_km = apply_pct_noise(dolmus_base)
+            otobus_km = apply_pct_noise(otobus_base)
+            metro_km = apply_pct_noise(metro_base)
+            otomobil_km = apply_pct_noise(otomobil_base)
+            ucak_km = apply_pct_noise(ucak_base)
+
+            # Aylık CO2 emisyonu (makro katsayıları değiştirmiyoruz)
+            aylik_co2_kg = round(
                 dolmus_km * dolmus_factor +
                 otobus_km * otobus_factor +
                 metro_km * metro_factor +
                 otomobil_km * otomobil_factor +
                 ucak_km * ucak_factor
             , 2)
-            
+
             user_data.append({
                 'user_id': user_id,
-                'hafta': hafta,
+                'ay': ay,
                 'dolmus_km': max(0, dolmus_km),
                 'otobus_km': max(0, otobus_km),
                 'metro_km': max(0, metro_km),
                 'otomobil_km': max(0, otomobil_km),
                 'ucak_km': max(0, ucak_km),
-                'haftalik_co2_kg': haftalik_co2_kg
+                'aylik_co2_kg': aylik_co2_kg
             })
-        
+
         sentetik_veriler.extend(user_data)
     
     # DataFrame'e çevir
     df_sentetik = pd.DataFrame(sentetik_veriler)
-    print(f"📊 {len(df_sentetik)} kullanıcı için {len(df_sentetik)} haftalık veri oluşturuldu")
-    print(f"📅 Hafta aralığı: 1-20")
-    print(f"🚌 Ortalama haftalık ulaşım: {df_sentetik[['dolmus_km', 'otobus_km', 'metro_km', 'otomobil_km', 'ucak_km']].sum(axis=1).mean():.1f} km")
-    print(f"📈 Ortalama haftalık CO2: {df_sentetik['haftalik_co2_kg'].mean():.2f} kg")
+    print(f"📊 {len(df_sentetik)} aylık kayıt oluşturuldu")
+    print(f"📅 Ay aralığı: 1-30")
+    print(f"🚌 Ortalama aylık ulaşım: {df_sentetik[['dolmus_km', 'otobus_km', 'metro_km', 'otomobil_km', 'ucak_km']].sum(axis=1).mean():.1f} km")
+    print(f"📈 Ortalama aylık CO2: {df_sentetik['aylik_co2_kg'].mean():.2f} kg")
     
     # Özellikler ve hedef değişken
     df_sentetik['sehir_kodu'] = 34  # İstanbul kodu
     df_sentetik['arac_sahibi'] = 1  # Araç sahibi
-    df_sentetik['lag_1_co2'] = df_sentetik.groupby('user_id')['haftalik_co2_kg'].shift(1)
-    df_sentetik['lag_2_co2'] = df_sentetik.groupby('user_id')['haftalik_co2_kg'].shift(2)
-    df_sentetik['lag_3_co2'] = df_sentetik.groupby('user_id')['haftalik_co2_kg'].shift(3)
-    df_sentetik['lag_4_co2'] = df_sentetik.groupby('user_id')['haftalik_co2_kg'].shift(4)
-    df_sentetik['target_next_week_co2'] = df_sentetik.groupby('user_id')['haftalik_co2_kg'].shift(-1)
+    df_sentetik['lag_1_co2'] = df_sentetik.groupby('user_id')['aylik_co2_kg'].shift(1)
+    df_sentetik['lag_2_co2'] = df_sentetik.groupby('user_id')['aylik_co2_kg'].shift(2)
+    df_sentetik['lag_3_co2'] = df_sentetik.groupby('user_id')['aylik_co2_kg'].shift(3)
+    df_sentetik['lag_4_co2'] = df_sentetik.groupby('user_id')['aylik_co2_kg'].shift(4)
+    df_sentetik['target_next_month_co2'] = df_sentetik.groupby('user_id')['aylik_co2_kg'].shift(-1)
     
     # Veriyi kaydet
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
@@ -261,23 +283,23 @@ def train_turkiye_model():
     
     # Model eğitimi
     feature_cols = [
-        'hafta', 'sehir_kodu', 'arac_sahibi',
+        'ay', 'sehir_kodu', 'arac_sahibi',
         'dolmus_km', 'otobus_km', 'metro_km', 'otomobil_km', 'ucak_km',
         'lag_1_co2', 'lag_2_co2', 'lag_3_co2', 'lag_4_co2'
     ]
-    
-    # Son 3 hafta test, geri kalani eğitim
-    train_df = df_sentetik[df_sentetik['hafta'] <= 17]
-    test_df = df_sentetik[df_sentetik['hafta'] > 17]
-    
+
+    # Son 3 ay test, geri kalani eğitim
+    train_df = df_sentetik[df_sentetik['ay'] <= 17]
+    test_df = df_sentetik[df_sentetik['ay'] > 17]
+
     # NaN değerleri temizle
-    train_df = train_df.dropna(subset=['target_next_week_co2'])
-    test_df = test_df.dropna(subset=['target_next_week_co2'])
-    
+    train_df = train_df.dropna(subset=['target_next_month_co2'])
+    test_df = test_df.dropna(subset=['target_next_month_co2'])
+
     x_train = train_df[feature_cols]
-    y_train = train_df['target_next_week_co2']
+    y_train = train_df['target_next_month_co2']
     x_test = test_df[feature_cols]
-    y_test = test_df['target_next_week_co2']
+    y_test = test_df['target_next_month_co2']
     
     model = XGBRegressor(
         n_estimators=180,
@@ -298,7 +320,7 @@ def train_turkiye_model():
     
     print(f"✅ Model eğitildi: {MODEL_PATH.resolve()}")
     print(f"✅ Özellikler kaydedildi: {FEATURES_PATH.resolve()}")
-    print(f"📈 Test MAE: {mae:.3f} kg CO2/hafta")
+    print(f"📈 Test MAE: {mae:.3f} kg CO2/ay")
     
     return model
 
