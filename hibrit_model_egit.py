@@ -8,14 +8,11 @@ from typing import Any, Dict, List, Sequence, Tuple
 
 import joblib
 import numpy as np
-import pandas as pd
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import GroupKFold
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
-from xgboost import XGBRegressor
-import shap
 
 MODEL_DIR = Path("modeller")
 HYBRID_MODEL_PATH = MODEL_DIR / "hibrit_model.joblib"
@@ -29,7 +26,7 @@ TRANSPORT_COLUMNS = ["dolmus_km", "otobus_km", "metro_km", "otomobil_km", "ucak_
 LAG_COUNT = 4
 
 
-def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
+def engineer_features(df: 'pd.DataFrame') -> 'pd.DataFrame':
     """Ek özellikler üretir: toplam ulaşım, lag istatistikleri ve trend."""
     df = df.copy()
     transport_cols = ["dolmus_km", "otobus_km", "metro_km", "otomobil_km", "ucak_km"]
@@ -40,8 +37,10 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def hazirla_turkiye_verisi() -> pd.DataFrame:
+def hazirla_turkiye_verisi() -> 'pd.DataFrame':
     """Türkiye'nin gerçek emisyon verisiyle doğrudan model eğitim verisi hazırlar."""
+    import pandas as pd
+
     print("🇹🇷 GERÇEK TÜRKİYE EMİSYON VERİSİYLE HİBRİT MODEL EĞİTİMİ...")
 
     if not DATASET_PATH.exists():
@@ -63,7 +62,7 @@ def hazirla_turkiye_verisi() -> pd.DataFrame:
     return df[expected].copy()
 
 
-def hazirla_ogrenme_tablosu(ham_df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
+def hazirla_ogrenme_tablosu(ham_df: 'pd.DataFrame') -> Tuple['pd.DataFrame', List[str]]:
     """Geçmiş aylardan gelecek ay CO2 tahmini için supervised tablo üretir"""
     df = ham_df.sort_values(["user_id", "ay"]).copy()
     df = engineer_features(df)
@@ -98,9 +97,9 @@ class HibritModel:
 
     def _build_oof_meta_features(
         self,
-        X: pd.DataFrame,
-        y: pd.Series,
-        groups: pd.Series,
+        X: 'pd.DataFrame',
+        y: 'pd.Series',
+        groups: 'pd.Series',
         n_splits: int = 5,
     ) -> np.ndarray:
         """Out-of-fold tahminler üreterek meta-özellik tablosu oluşturur."""
@@ -114,6 +113,8 @@ class HibritModel:
             X_train_fold = X.iloc[train_idx]
             y_train_fold = y.iloc[train_idx]
             X_valid_fold = X.iloc[valid_idx]
+
+            from xgboost import XGBRegressor
 
             xgb_fold = XGBRegressor(
                 n_estimators=600,
@@ -153,8 +154,10 @@ class HibritModel:
 
         return oof_preds
 
-    def _fit_base_learners(self, X: pd.DataFrame, y: pd.Series) -> None:
+    def _fit_base_learners(self, X: 'pd.DataFrame', y: 'pd.Series') -> None:
         print("🤖 Temel XGBoost modeli eğitiliyor...")
+        from xgboost import XGBRegressor
+
         self.xgb_model = XGBRegressor(
             n_estimators=600,
             max_depth=8,
@@ -191,9 +194,9 @@ class HibritModel:
 
     def fit(
         self,
-        X_train: pd.DataFrame,
-        y_train: pd.Series,
-        groups: pd.Series,
+        X_train: 'pd.DataFrame',
+        y_train: 'pd.Series',
+        groups: 'pd.Series',
     ) -> None:
         """Stacking modeli eğitir."""
         print("🚀 Stacking eğitim süreci başlıyor...")
@@ -204,23 +207,25 @@ class HibritModel:
         self.feature_means = X_train.mean().to_dict()
         print("✅ Tüm base learner modelleri yeniden tam veriyle eğitildi")
 
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
+    def predict(self, X: 'pd.DataFrame') -> np.ndarray:
         xgb_pred = self.xgb_model.predict(X)
         X_scaled = self.scaler.transform(X)
         mlp_pred = self.mlp_model.predict(X_scaled)
         meta_X = np.column_stack([xgb_pred, mlp_pred])
         return self.meta_model.predict(meta_X)
 
-    def explain_xgb(self, X: pd.DataFrame) -> np.ndarray:
+    def explain_xgb(self, X: 'pd.DataFrame') -> np.ndarray:
         """XGBoost bileşeni için SHAP değerleri hesaplar."""
         if self.xgb_model is None:
             raise ValueError("XGB modeli yuklu degil.")
+
+        import shap
 
         explainer = shap.TreeExplainer(self.xgb_model)
         shap_vals = explainer.shap_values(X)
         return shap_vals
 
-    def get_individual_predictions(self, X: pd.DataFrame) -> Dict[str, np.ndarray]:
+    def get_individual_predictions(self, X: 'pd.DataFrame') -> Dict[str, np.ndarray]:
         xgb_pred = self.xgb_model.predict(X)
         X_scaled = self.scaler.transform(X)
         mlp_pred = self.mlp_model.predict(X_scaled)
